@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2025 The Contributors to Eclipse OpenSOVD (see CONTRIBUTORS)
+#
+# SPDX-License-Identifier: Apache-2.0
+
+version = 1
+
+[[annotations]]
+path = [
+    "README.md",
+    "NOTICE",
+    "CONTRIBUTORS",
+    ".gitignore",
+    ".idea/**",
+    "config/**",
+    "converter/src/main/resources/schema/NOTICE",
+]
+precedence = "override"
+SPDX-FileCopyrightText = "2025 The Contributors to Eclipse OpenSOVD"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = [
+    "gradle/**",
+    "gradlew",
+    "gradlew.bat"
+]
+precedence = "override"
+SPDX-FileCopyrightText = "Copyright (unknown year) the original author or authors"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = [
+    "converter/src/main/resources/schema/odx*.xsd",
+]
+precedence = "override"
+SPDX-FileCopyrightText = "© ISO 2008 All rights reserved."
+SPDX-License-Identifier = "LicenseRef-ISO-Proprietary"
