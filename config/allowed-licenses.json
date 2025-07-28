@@ -1,0 +1,42 @@
+{
+  "allowedLicenses":[
+    {
+      "moduleLicense": "Apache-2.0",
+      "moduleName": ".*"
+    },
+    {
+      "moduleLicense": "MIT",
+      "moduleName": ".*"
+    },
+    {
+      "moduleLicense": "0BSD",
+      "moduleName": ".*"
+    },
+    {
+      "moduleLicense": "BSD-3-Clause",
+      "moduleName": ".*"
+    },
+    {
+      "moduleLicense": "BSD-2-Clause",
+      "moduleName": ".*"
+    },
+    {
+      "moduleLicense": "EPL-2.0",
+      "moduleName": ".*"
+    },
+    {
+      "moduleLicense": "CDDL-1.0",
+      "moduleName": ".*"
+    },
+    {
+      "moduleLicense": null,
+      "moduleName": "com.google.code.javaparser:javaparser",
+      "comment": "Multiple licenses available, including Apache 2.0"
+    },
+    {
+      "moduleLicense": "CDDL+GPL License",
+      "moduleName": "com.sun.xml.bind:jaxb-impl",
+      "comment": "Licenses are either or, we choose CDDL-1.0"
+    }
+  ]
+}
