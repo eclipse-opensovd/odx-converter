@@ -496,9 +496,8 @@ message TableRow {
   optional LongName longName = 3;
   string key = 4;
   optional DOP.Ref dop = 5;
-  // optional string dopShortNameRef;
   optional DOP.Ref structure = 6;
-  reserved 7; // optional string structureShortNameRef = 7;
+  reserved 7; // was structureShortNameRef = 7;, can probably be deleted when we do final renumbering
   optional SDGS.Ref sdgs = 8;
   optional Audience.Ref audience = 9;
   repeated FunctClass.Ref functClassRefs = 10;
@@ -582,7 +581,6 @@ message Param {
 
   message LengthKeyRef {
     DOP.Ref dop = 1;
-//    optional string dopShortNameRef = 2;
   }
 
   message MatchingRequestParam {
@@ -598,7 +596,6 @@ message Param {
   message PhysConst {
     string physConstantValue = 1;
     optional DOP.Ref dop = 2;
-//    optional string dopShortNameRef = 3;
   }
 
   message Reserved {
@@ -607,7 +604,6 @@ message Param {
 
   message System {
     DOP.Ref dop = 1;
-//    string dopShortNameRef = 2;
     string sysParam = 3;
   }
 
@@ -636,7 +632,6 @@ message Param {
   message Value {
     optional string physicalDefaultValue = 1;
     DOP.Ref dop = 2;
-    // optional string dopShortNameRef = 3;
   }
 
   oneof SpecificData {

@@ -232,14 +232,6 @@ class ODXCollection(val data: Map<String, ODX>) {
         data.associateBy { it.id }
     }
 
-// comParamRefs are directly resolved to protobuf and added in DiagService/DiagLayer
-//    val comParamRefs: Set<COMPARAMREF> by lazy {
-//        val data = basevariants.values.flatMap { it.comparamrefs?.comparamref ?: emptyList() } +
-//                ecuvariants.values.flatMap { it.comparamrefs?.comparamref ?: emptyList() } +
-//                functionalGroups.values.flatMap { it.comparamrefs?.comparamref ?: emptyList() }
-//        data.toSet()
-//    }
-
     val diagDataDictionaries: List<DIAGDATADICTIONARYSPEC> by lazy {
         basevariants.values.mapNotNull { it.diagdatadictionaryspec } +
                 ecuvariants.values.mapNotNull { it.diagdatadictionaryspec } +
@@ -560,8 +552,6 @@ fun convert(inputFile: File, outputFile: File, logger: Logger, options: Converte
 
     val sizeCompressed = outputFile.toPath().fileSize()
     logger.info("Writing database took $writingDuration total (compression: $compressionDuration) - size uncompressed: ${sizeUncompressed.format()} bytes, compressed: ${sizeCompressed.format()} bytes - ratio: ${(sizeUncompressed.toFloat() / sizeCompressed).format()} ")
-
-//    ReaderTest(outFile).readData()
 }
 
 fun createJobsChunks(
@@ -579,12 +569,7 @@ fun createJobsChunks(
     return files.mapNotNull { fileName ->
         val data = inputData[fileName]
         if (data == null) {
-//            if (options.lenient) {
-//                logger.warning("File $fileName is not included in PDX")
-//                null
-//            } else {
             throw IllegalStateException("File $fileName is not included in PDX")
-//            }
         } else {
             logger.info("Including $fileName (${data.size} bytes)")
             Chunk.newBuilder()
@@ -777,9 +762,9 @@ class Converter : CliktCommand() {
     }
 }
 
-fun main(args: Array<String>) =
-    Converter().main(args)
-
 fun Number.format(): String =
     NumberFormat.getNumberInstance().format(this)
+
+fun main(args: Array<String>) =
+    Converter().main(args)
 
