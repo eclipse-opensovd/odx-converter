@@ -1,4 +1,4 @@
-name: Build
+name: Build ODX Converter
 
 on:
   push:
@@ -16,8 +16,8 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: 17
+          java-version: 21
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
       - name: Build with Gradle
-        run: ./gradlew build
+        run: ./gradlew clean build shadowJar
