@@ -1,3 +1,5 @@
+## Notes
+
 This directory must contain the XML schema (XSD) for the ODX format as specified in Annex C of ISO 22901-1:2008.
 
 Due to licensing restrictions, this file cannot be distributed here. Users are responsible for obtaining the
