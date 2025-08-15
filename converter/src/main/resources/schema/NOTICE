@@ -1,1 +1,6 @@
-This directory must contain the XML schema (XSD) for the ODX format as specified in Annex C of ISO 22901-1:2008. Due to licensing restrictions, this file cannot be distributed here. Users are responsible for obtaining the schema file independently and ensuring it is named `odx_2_2_0.xsd`.
+This directory must contain the XML schema (XSD) for the ODX format as specified in Annex C of ISO 22901-1:2008.
+
+Due to licensing restrictions, this file cannot be distributed here. Users are responsible for obtaining the
+schema file independently and ensuring it is named `odx_2_2_0.xsd`.
+
+Make sure only `odx_2_2_0.xsd` (and `odx-xhtml.xsd`) are present, adding other xsd files can cause issues.
