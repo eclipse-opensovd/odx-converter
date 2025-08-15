@@ -20,7 +20,8 @@ Compression sizes vary, but here are some typical values:
 
 ### Notes 
 - __This software is in early development, the output format may change in incompatible ways, until the first release (1.0.0)__
-- __Due to copyright, we can't provide the required odx-schema at the moment. You'll have to provide it yourself.__
+- __Due to copyright, we can't provide the required odx-schema at the moment. You'll have to provide it yourself.__   
+ Please read the schema [NOTICE](converter/src/main/resources/schema/NOTICE.md).
 
 ### Usage 📜
 
