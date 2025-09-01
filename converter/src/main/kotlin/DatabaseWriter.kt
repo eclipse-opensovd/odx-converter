@@ -743,10 +743,11 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
 
         dtc.setId(objectId())
         dtc.setShortName(this.shortname)
-        this.sdgs?.let { dtc.setSdgs(it.getRef()) }
+        dtc.setTroubleCode(this.troublecode.toUInt().toInt())
         this.displaytroublecode?.let { dtc.setDisplayTroubleCode(it) }
-        this.level?.let { dtc.setLevel(it.toInt()) }
         this.text?.let { dtc.setText(it.toProtoBuf()) }
+        this.level?.let { dtc.setLevel(it.toInt()) }
+        this.sdgs?.let { dtc.setSdgs(it.getRef()) }
         dtc.setIsTemporary(this.isISTEMPORARY)
 
         return dtc.build()
