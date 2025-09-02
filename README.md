@@ -52,6 +52,9 @@ Arguments:
 **Prerequisites**:
 - Installed JDK 21 — we recommend [Eclipse Temurin Java JDK 21](https://adoptium.net/temurin/releases?version=21&os=any&arch=any)
 
+Provide ODX schema:
+Place the files odx_2_2_0.xsd and odx-xhtml.xsd in converter/src/main/resources/schema/
+
 Execute Gradle:
 ```shell
 ./gradlew clean build shadowJar
