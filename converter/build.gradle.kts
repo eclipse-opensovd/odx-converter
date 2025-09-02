@@ -43,7 +43,7 @@ dependencies {
         // the schema.odx package, and provide them as a library,
         // including them with a statement like
         // implementation(file("lib/odx-schema-2.2.0.jar"))
-        error("Schema is missing, aborting build")
+        error("ODX schema not found at $odxSchema, aborting build")
     }
 
     xjcPlugins(libs.jaxb2.basics)
