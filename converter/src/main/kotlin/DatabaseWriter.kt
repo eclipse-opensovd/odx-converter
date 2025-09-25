@@ -31,7 +31,11 @@ import schema.odx.DTCDOP
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.logging.Logger
 
-class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection, private val options: ConverterOptions) {
+class DatabaseWriter(
+    private val logger: Logger,
+    private val odx: ODXCollection,
+    private val options: ConverterOptions
+) {
     private val idSequence = AtomicInteger(1)
 
     private val objectIds = mutableMapOf<Any, Int>()
@@ -68,6 +72,7 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
     private val baseVariantMap: MutableMap<BASEVARIANT, Variant> = mutableMapOf()
     private val ecuVariantMap: MutableMap<ECUVARIANT, Variant> = mutableMapOf()
     private val functionalGroupMap: MutableMap<FUNCTIONALGROUP, FunctionalGroup> = mutableMapOf()
+    private val ecuSharedDataMap: MutableMap<ECUSHAREDDATA, EcuSharedData> = mutableMapOf()
     private val physDimensionMap: MutableMap<PHYSICALDIMENSION, PhysicalDimension> = mutableMapOf()
     private val librariesMap: MutableMap<LIBRARY, Library> = mutableMapOf()
 
@@ -82,7 +87,9 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
         unitMap.fillMissing(odx.units.values) { it.toProtoBuf() }
         dtcs.fillMissing(odx.dtcs.values) { it.toProtoBuf() }
         dopMap.fillMissing(odx.combinedDataObjectProps.values) { it.toProtoBuf() }
-        dopMap.fillMissing(odx.comParamSubSets.values.flatMap { it.dataobjectprops?.dataobjectprop ?: emptyList() }) { it.toProtoBuf() }
+        dopMap.fillMissing(odx.comParamSubSets.values.flatMap {
+            it.dataobjectprops?.dataobjectprop ?: emptyList()
+        }) { it.toProtoBuf() }
 
         tableMap.fillMissing(odx.tables.values) { it.toProtoBuf() }
         tableRowMap.fillMissing(odx.tableRows.values) { it.toProtoBuf() }
@@ -106,13 +113,20 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
         ecuVariantMap.fillMissing(odx.ecuvariants.values) { it.toProtoBuf() }
         functionalGroupMap.fillMissing(odx.functionalGroups.values) { it.toProtoBuf() }
         physDimensionMap.fillMissing(odx.physDimensions.values) { it.toProtoBuf() }
+        ecuSharedDataMap.fillMissing(odx.ecuSharedDatas.values) { it.toProtoBuf() }
 
         val unused = mutableMapOf<Int, Any>().also { it.putAll(predetermineObjectIds) }
         usedObjectIds.keys.forEach { unused.remove(it) }
         logger.info("${odx.ecuName} referenced ${predetermineObjectIds.size} / total ${usedObjectIds.keys.size} / unused ${unused.size}")
         if (unused.isNotEmpty()) {
             // Unused entries indicate that a reference was created but never put into the protobuf structure
-            logger.warning("Warning: Unused references - this usually means, that something was referenced, but that something was not saved to the output file: ${unused.values.joinToString(", ")}")
+            logger.warning(
+                "Warning: Unused references - this usually means, that something was referenced, but that something was not saved to the output file: ${
+                    unused.values.joinToString(
+                        ", "
+                    )
+                }"
+            )
         }
     }
 
@@ -171,6 +185,7 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
         builder.addAllProtocols(protocolMap.values)
         builder.addAllProtStacks(protStackMap.values)
         builder.addAllLibraries(librariesMap.values)
+        builder.addAllEcuSharedDatas(ecuSharedDataMap.values)
 
         return builder.build()
     }
@@ -253,7 +268,8 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
         this.longname?.let { table.setLongName(it.toProtoBuf()) }
         this.keylabel?.let { table.setKeyLabel(it) }
         this.keydopref?.idref?.let {
-            val dop = odx.combinedDataObjectProps[it]?.getRef() ?: throw IllegalStateException("Couldn't find dop ${it}")
+            val dop =
+                odx.combinedDataObjectProps[it]?.getRef() ?: throw IllegalStateException("Couldn't find dop ${it}")
             table.setKeyDop(dop)
         }
         this.structlabel?.let { table.setStructLabel(it) }
@@ -478,14 +494,16 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
                 param.setSystem(system)
             } else if (this is TABLEKEY) {
                 val tableKey = TableKey.newBuilder()
-                val entry = this.rest.firstOrNull()?.value ?: throw IllegalStateException("TABLE-KEY ${this.id} has no entries")
+                val entry =
+                    this.rest.firstOrNull()?.value ?: throw IllegalStateException("TABLE-KEY ${this.id} has no entries")
                 if (this.rest.size > 1) {
                     throw IllegalStateException("TABLE-KEY ${this.id} has more than one entry")
                 }
                 if (entry is ODXLINK) {
                     val table = odx.tables[entry.idref]
                     if (table == null) {
-                        val row = odx.tableRows[entry.idref] ?: throw IllegalStateException("ODXLINK ${this.id} is neither TABLE nor TABLE-KEY")
+                        val row = odx.tableRows[entry.idref]
+                            ?: throw IllegalStateException("ODXLINK ${this.id} is neither TABLE nor TABLE-KEY")
                         tableKey.setTableRow(row.getRef())
                     } else {
                         tableKey.setTable(table.getRef())
@@ -508,7 +526,8 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
                 if (this.tablekeysnref != null) {
                     TODO("TABLE-KEY-SNREF not supported ${this.shortname}")
                 }
-                val tableKey = odx.tableKeys[this.tablekeyref.idref] ?: throw IllegalStateException("Couldn't find TABLE-KEY ${this.tablekeyref.idref}")
+                val tableKey = odx.tableKeys[this.tablekeyref.idref]
+                    ?: throw IllegalStateException("Couldn't find TABLE-KEY ${this.tablekeyref.idref}")
                 tableStruct.setTableKey(tableKey.getRef())
                 param.setTableStruct(tableStruct.build())
             } else {
@@ -562,7 +581,7 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
     }
 
     private fun DOPBASE.getRef(): DOP.Ref {
-        val dopBase = dopMap.getOrCreate(this) { it.toProtoBuf()}
+        val dopBase = dopMap.getOrCreate(this) { it.toProtoBuf() }
 
         return DOP.Ref.newBuilder().setRef(ObjectID.newBuilder().setValue(dopBase.id.value)).build()
     }
@@ -606,7 +625,8 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
 
             is PARAMLENGTHINFOTYPE -> {
                 val paramLengthInfoType = DiagCodedType.ParamLengthInfoType.newBuilder()
-                val param = odx.lengthKeys[this.lengthkeyref.idref] ?: throw IllegalStateException("Unknown length key reference ${this.lengthkeyref.idref}")
+                val param = odx.lengthKeys[this.lengthkeyref.idref]
+                    ?: throw IllegalStateException("Unknown length key reference ${this.lengthkeyref.idref}")
                 paramLengthInfoType.setLengthKey(param.getRef())
                 diagCodedType.setParamLengthInfoType(paramLengthInfoType.build())
             }
@@ -1006,7 +1026,8 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
         this.longname?.let { diagComm.setLongName(it.toProtoBuf()) }
         this.diagnosticclass?.let { diagComm.setDiagClassType(it.toProtoBufEnum()) }
         this.functclassrefs?.functclassref?.map {
-            val functClass = odx.functClasses[it.idref] ?: throw IllegalStateException("Couldn't find funct class ${it.idref}")
+            val functClass =
+                odx.functClasses[it.idref] ?: throw IllegalStateException("Couldn't find funct class ${it.idref}")
             diagComm.functClass = functClass.getRef()
         }
         this.semantic?.let { diagComm.setSemantic(it) }
@@ -1104,7 +1125,8 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
         this.entrypoint?.let { progCode.setEntrypoint(it) }
         this.libraryrefs?.libraryref?.let {
             progCode.addAllLibrary(it.map { ref ->
-                val library = odx.libraries[ref.idref] ?: throw IllegalStateException("Couldn't find LIBRARY ${ref.idref}")
+                val library =
+                    odx.libraries[ref.idref] ?: throw IllegalStateException("Couldn't find LIBRARY ${ref.idref}")
                 library.getRef()
             })
         }
@@ -1163,7 +1185,7 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
             .build()
     }
 
-    private fun HIERARCHYELEMENT.toProtoBuf(): DiagLayer {
+    private fun DIAGLAYER.toProtoBufInternal(): DiagLayer.Builder {
         val diagLayer = DiagLayer.newBuilder()
 
         diagLayer.setShortName(this.shortname)
@@ -1191,12 +1213,24 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
             // TODO - not supported yet
         }
 
-        this.comparamrefs?.comparamref?.let {
-            diagLayer.addAllComParamRefs(it.map { ref -> ref.toProtoBuf() })
-        }
         this.functclasss?.functclass?.let { diagLayer.addAllFunctClasses(it.map { fc -> fc.getRef() }) }
 
         this.additionalaudiences?.additionalaudience?.let { diagLayer.addAllAdditionalAudiences(it.map { aa -> aa.getRef() }) }
+
+        return diagLayer
+    }
+
+    private fun DIAGLAYER.toProtoBuf(): DiagLayer {
+        return this.toProtoBufInternal().build()
+    }
+
+    private fun HIERARCHYELEMENT.toProtoBuf(): DiagLayer {
+        val diagLayer = (this as DIAGLAYER).toProtoBufInternal()
+
+        // comparam refs are for hierarchielements
+        this.comparamrefs?.comparamref?.let {
+            diagLayer.addAllComParamRefs(it.map { ref -> ref.toProtoBuf() })
+        }
 
         return diagLayer.build()
     }
@@ -1207,6 +1241,9 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
         variant.setId(objectId())
         variant.setDiagLayer((this as HIERARCHYELEMENT).toProtoBuf())
         variant.setIsBaseVariant(true)
+        this.parentrefs?.parentref?.let { parentRefs ->
+            variant.addAllParentRefs(parentRefs.map { it.toProtoBuf() })
+        }
 
         this.basevariantpattern?.matchingbasevariantparameters?.matchingbasevariantparameter?.let { patterns ->
             val vp = VariantPattern.newBuilder().addAllMatchingParameter(patterns.map { it.toProtoBuf() }).build()
@@ -1222,6 +1259,9 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
         variant.setId(objectId())
         variant.setDiagLayer((this as HIERARCHYELEMENT).toProtoBuf())
         variant.setIsBaseVariant(false)
+        this.parentrefs?.parentref?.let { parentRefs ->
+            variant.addAllParentRefs(parentRefs.map { it.toProtoBuf() })
+        }
 
         this.ecuvariantpatterns?.ecuvariantpattern?.let { patterns ->
             variant.addAllVariantPattern(patterns.map { it.toProtoBuf() })
@@ -1230,15 +1270,90 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
         return variant.build()
     }
 
+    private fun ECUSHAREDDATA.toProtoBuf(): EcuSharedData {
+        val ecuShareData = EcuSharedData.newBuilder()
+        ecuShareData.setDiagLayer((this as DIAGLAYER).toProtoBuf())
+        if (this.diagvariables?.diagvariableproxy?.isNotEmpty() == true) {
+            logger.warning("DiagVariables from ${this.id} are not supported yet")
+            if (!options.lenient) {
+                throw NotImplementedError("DiagVariables from ${this.id} are not supported yet")
+            }
+        }
+        if (this.variablegroups?.variablegroup?.isNotEmpty() == true) {
+            logger.warning("VariableGroups from ${this.id} are not supported yet")
+            if (!options.lenient) {
+                throw NotImplementedError("VariableGroups from ${this.id} are not supported yet")
+            }
+        }
+        return ecuShareData.build()
+    }
+
+    fun PARENTREF.toProtoBuf(): ParentRef {
+        val parentRef = ParentRef.newBuilder()
+
+        val resolved = odx.basevariants[this.idref] ?: odx.ecuvariants[this.idref] ?: odx.protocols[this.idref]
+        ?: odx.functionalGroups[this.idref] ?: odx.tables[this.idref] ?: odx.ecuSharedDatas[this.idref]
+
+        when (resolved) {
+            is BASEVARIANT -> parentRef.variant = resolved.getRef()
+            is ECUVARIANT -> parentRef.variant = resolved.getRef()
+            is PROTOCOL -> parentRef.protocol = resolved.getRef()
+            is TABLE -> parentRef.table = resolved.getRef()
+            is FUNCTIONALGROUP -> parentRef.functionalGroup = resolved.getRef()
+            is ECUSHAREDDATA -> parentRef.ecuSharedData = resolved.getRef()
+            else -> throw UnsupportedOperationException("Unsupported idref type: ${this.idref} / ${this.doctype?.value()} ($resolved)")
+        }
+        this.notinheriteddiagcomms?.notinheriteddiagcomm?.let { diagCommRefs ->
+            parentRef.addAllNotInheritedDiagCommShortNames(diagCommRefs.map { it.diagcommsnref.shortname })
+        }
+        this.notinheriteddops?.notinheriteddop?.let { dopRefs ->
+            parentRef.addAllNotInheritedDopsShortNames(dopRefs.map { it.dopbasesnref.shortname })
+        }
+        this.notinheritedtables?.notinheritedtable?.let { tableRefs ->
+            parentRef.addAllNotInheritedTablesShortNames(tableRefs.map { it.tablesnref.shortname })
+        }
+        this.notinheritedvariables?.notinheritedvariable?.let { variables ->
+            parentRef.addAllNotInheritedVariablesShortNames(variables.map { it.diagvariablesnref.shortname })
+        }
+        this.notinheritedglobalnegresponses?.notinheritedglobalnegresponse?.let { negResponses ->
+            parentRef.addAllNotInheritedGlobalNegResponsesShortNames(negResponses.map { it.globalnegresponsesnref.shortname })
+        }
+
+        return parentRef.build()
+    }
+
+    private fun ECUSHAREDDATA.getRef(): EcuSharedData.Ref {
+        val ecuSharedData = ecuSharedDataMap.getOrCreate(this) { it.toProtoBuf() }
+        return EcuSharedData.Ref.newBuilder().setRef(ObjectID.newBuilder().setValue(ecuSharedData.id.value)).build()
+    }
+
+    private fun FUNCTIONALGROUP.getRef(): FunctionalGroup.Ref {
+        val functionalGroup = functionalGroupMap.getOrCreate(this) { it.toProtoBuf() }
+        return FunctionalGroup.Ref.newBuilder().setRef(ObjectID.newBuilder().setValue(functionalGroup.id.value).build())
+            .build()
+    }
+
     private fun FUNCTIONALGROUP.toProtoBuf(): FunctionalGroup {
         val functionalGroup = FunctionalGroup.newBuilder()
 
         functionalGroup.setId(objectId())
         functionalGroup.setDiagLayer((this as HIERARCHYELEMENT).toProtoBuf())
+        this.parentrefs?.parentref?.let { parentRefs ->
+            functionalGroup.addAllParentRefs(parentRefs.map { it.toProtoBuf() })
+        }
 
         return functionalGroup.build()
     }
 
+    fun BASEVARIANT.getRef(): Variant.Ref {
+        val variant = baseVariantMap.getOrCreate(this) { it.toProtoBuf() }
+        return Variant.Ref.newBuilder().setRef(ObjectID.newBuilder().setValue(variant.id.value).build()).build()
+    }
+
+    fun ECUVARIANT.getRef(): Variant.Ref {
+        val variant = ecuVariantMap.getOrCreate(this) { it.toProtoBuf() }
+        return Variant.Ref.newBuilder().setRef(ObjectID.newBuilder().setValue(variant.id.value).build()).build()
+    }
 
     private fun DIAGSERVICE.getRef(): DiagService.Ref {
         val service = diagServicesMap.getOrCreate(this) { it.toProtoBuf() }
@@ -1326,11 +1441,12 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
 
         this.outparamifsnref?.shortname?.let { expectedShortName ->
             val param = diagService.posresponserefs?.posresponseref?.flatMap { pr ->
-                    val posResponse = odx.posResponses[pr.idref] ?: throw IllegalStateException("Couldn't find pos response ${pr.idref}")
-                    posResponse.params?.param ?: emptyList()
-                }?.firstOrNull { params ->
-                    params.shortname == expectedShortName
-                } ?: throw IllegalStateException("Couldn't find param for shortName $expectedShortName")
+                val posResponse =
+                    odx.posResponses[pr.idref] ?: throw IllegalStateException("Couldn't find pos response ${pr.idref}")
+                posResponse.params?.param ?: emptyList()
+            }?.firstOrNull { params ->
+                params.shortname == expectedShortName
+            } ?: throw IllegalStateException("Couldn't find param for shortName $expectedShortName")
 
             matchingParameter.setOutParam(param.getRef())
         }
@@ -1587,7 +1703,8 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
         }
 
         this.protocolsnref?.shortname?.let { shortName ->
-            val protocolOdx = odx.protocols.values.firstOrNull { it.shortname == shortName }  ?: throw IllegalStateException("Couldn't find PROTOCOL $shortName")
+            val protocolOdx = odx.protocols.values.firstOrNull { it.shortname == shortName }
+                ?: throw IllegalStateException("Couldn't find PROTOCOL $shortName")
             val protocol = protocolOdx.getObjectRef()
             comParamRef.setProtocol(
                 Protocol.Ref.newBuilder().setRef(protocol).build()
@@ -1595,8 +1712,8 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
         }
 
         this.protstacksnref?.let {
-            val protStackOdx = odx.protStacks.values.firstOrNull { it.shortname == this.protstacksnref.shortname } ?:
-                                    throw IllegalStateException("Can't find protocol ${this.protstacksnref.shortname}")
+            val protStackOdx = odx.protStacks.values.firstOrNull { it.shortname == this.protstacksnref.shortname }
+                ?: throw IllegalStateException("Can't find protocol ${this.protstacksnref.shortname}")
 
             val protStack = protStackOdx.getObjectRef()
 
@@ -1640,7 +1757,8 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
         val switchKey = DOP.MUXDOP.SwitchKey.newBuilder()
         switchKey.bytePosition = this.byteposition.toInt()
         this.bitposition?.let { switchKey.bitPosition = it.toInt() }
-        val dop = odx.combinedDataObjectProps[this.dataobjectpropref.idref] ?: throw IllegalStateException("Couldn't find dop-ref ${this.dataobjectpropref.idref}")
+        val dop = odx.combinedDataObjectProps[this.dataobjectpropref.idref]
+            ?: throw IllegalStateException("Couldn't find dop-ref ${this.dataobjectpropref.idref}")
         switchKey.dop = dop.getRef()
         return switchKey.build()
     }
@@ -1650,7 +1768,8 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
         defaultCase.shortName = this.shortname
         this.longname?.let { defaultCase.longName = it.toProtoBuf() }
         this.structureref?.let {
-            val dop = odx.combinedDataObjectProps[it.idref] ?: throw IllegalStateException("Couldn't find dop-structure-ref ${this.structureref.idref}")
+            val dop = odx.combinedDataObjectProps[it.idref]
+                ?: throw IllegalStateException("Couldn't find dop-structure-ref ${this.structureref.idref}")
             defaultCase.structure = dop.getRef()
         }
         this.structuresnref?.shortname?.let {
@@ -1664,7 +1783,8 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
         val case = DOP.MUXDOP.Case.newBuilder()
         case.shortName = this.shortname
         this.longname?.let { case.longName = it.toProtoBuf() }
-        val dop = odx.combinedDataObjectProps[this.structureref.idref] ?: throw IllegalStateException("Couldn't find dop-structure-ref ${this.structureref.idref}")
+        val dop = odx.combinedDataObjectProps[this.structureref.idref]
+            ?: throw IllegalStateException("Couldn't find dop-structure-ref ${this.structureref.idref}")
         this.structuresnref?.shortname?.let {
             TODO("STRUCTURE shortnameref not supported for $this")
         }
@@ -1702,12 +1822,15 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
         this.sdgs?.getRef()?.let { tableRow.sdgs = it }
         this.audience?.let { tableRow.audience = it.getRef() }
         tableRow.addAllFunctClassRefs(this.functclassrefs?.functclassref?.map {
-            val functClass = odx.functClasses[it.idref] ?: throw IllegalStateException("Couldn't find funct class ${it.idref}")
+            val functClass =
+                odx.functClasses[it.idref] ?: throw IllegalStateException("Couldn't find funct class ${it.idref}")
             functClass.getRef()
         } ?: emptyList())
 
-        tableRow.addAllStateTransitionRefs(this.statetransitionrefs?.statetransitionref?.map { it.getRef() } ?: emptyList())
-        tableRow.addAllPreConditionStateRefs(this.preconditionstaterefs?.preconditionstateref?.map { it.getRef() } ?: emptyList())
+        tableRow.addAllStateTransitionRefs(this.statetransitionrefs?.statetransitionref?.map { it.getRef() }
+            ?: emptyList())
+        tableRow.addAllPreConditionStateRefs(this.preconditionstaterefs?.preconditionstateref?.map { it.getRef() }
+            ?: emptyList())
 
         tableRow.setIsExecutable(this.isISEXECUTABLE)
         tableRow.setIsMandatory(this.isISMANDATORY)
@@ -1716,7 +1839,7 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
         return tableRow.build()
     }
 
-    private inline fun <K: Any, V: Any> MutableMap<K, V>.getOrCreate(k: K, create: (K) -> V): V {
+    private inline fun <K : Any, V : Any> MutableMap<K, V>.getOrCreate(k: K, create: (K) -> V): V {
         var value = this[k]
         if (value == null) {
             value = create(k)
@@ -1725,7 +1848,7 @@ class DatabaseWriter(private val logger: Logger, private val odx: ODXCollection,
         return value
     }
 
-    private fun <K: Any, V: Any> MutableMap<K, V>.fillMissing(keys: Collection<K>, create: (K) -> V) {
+    private fun <K : Any, V : Any> MutableMap<K, V>.fillMissing(keys: Collection<K>, create: (K) -> V) {
         keys.forEach {
             if (!this.containsKey(it)) {
                 this[it] = create(it)

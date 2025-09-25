@@ -824,6 +824,36 @@ message DiagLayer {
 message FunctionalGroup {
   ObjectID id = 1;
   DiagLayer diagLayer = 2;
+  repeated ParentRef parentRefs = 3;
+
+  message Ref {
+    ObjectID ref = 1;
+  }
+}
+
+message ParentRef {
+  oneof Ref {
+    Variant.Ref variant = 1;
+    Protocol.Ref protocol = 2;
+    FunctionalGroup.Ref functionalGroup = 3;
+    Table.Ref table = 4;
+    EcuSharedData.Ref ecuSharedData = 5;
+  }
+  repeated string notInheritedDiagCommShortNames = 20;
+  repeated string notInheritedVariablesShortNames = 21;
+  repeated string notInheritedDopsShortNames = 22;
+  repeated string notInheritedTablesShortNames = 23;
+  repeated string notInheritedGlobalNegResponsesShortNames = 24;
+}
+
+message EcuSharedData {
+  ObjectID id = 1;
+  DiagLayer diagLayer = 2;
+  // In this place we'd add diagVariables and variableGroups, but we currently don't have any
+  // use-case for them
+  message Ref {
+    ObjectID ref = 1;
+  }
 }
 
 message Variant {
@@ -831,6 +861,11 @@ message Variant {
   DiagLayer diagLayer = 2;
   bool isBaseVariant = 3;
   repeated VariantPattern variantPattern = 4;
+  repeated ParentRef parentRefs = 5;
+
+  message Ref {
+    ObjectID ref = 1;
+  }
 }
 
 message ComplexValue {
@@ -1042,6 +1077,7 @@ message EcuData {
   repeated Protocol protocols = 28;
   repeated ProtStack protStacks = 29;
   repeated Library libraries = 30;
+  repeated EcuSharedData ecuSharedDatas = 35;
 
   enum FeatureFlag {
     RESERVED = 0;
