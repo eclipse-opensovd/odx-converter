@@ -390,7 +390,8 @@ class ODXCollection(val data: Map<String, ODX>) {
     val additionalAudiences: Map<String, ADDITIONALAUDIENCE> by lazy {
         val data = basevariants.values.flatMap { it.additionalaudiences?.additionalaudience ?: emptyList() } +
                 ecuvariants.values.flatMap { it.additionalaudiences?.additionalaudience ?: emptyList() } +
-                functionalGroups.values.flatMap { it.additionalaudiences?.additionalaudience ?: emptyList() }
+                functionalGroups.values.flatMap { it.additionalaudiences?.additionalaudience ?: emptyList() } +
+                ecuSharedDatas.values.flatMap { it.additionalaudiences?.additionalaudience ?: emptyList() }
 
         data.associateBy { it.id }
     }
@@ -398,7 +399,8 @@ class ODXCollection(val data: Map<String, ODX>) {
     val stateCharts: Map<String, STATECHART> by lazy {
         val data = basevariants.values.flatMap { it.statecharts?.statechart ?: emptyList() } +
                 ecuvariants.values.flatMap { it.statecharts?.statechart ?: emptyList() } +
-                functionalGroups.values.flatMap { it.statecharts?.statechart ?: emptyList() }
+                functionalGroups.values.flatMap { it.statecharts?.statechart ?: emptyList() } +
+                ecuSharedDatas.values.flatMap { it.statecharts?.statechart ?: emptyList() }
         data.associateBy { it.id }
     }
 
