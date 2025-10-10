@@ -75,7 +75,7 @@ This will convert the given pdx files into mdd.
 The MDD format is defined using two protobuf files, ensuring compatibility across various programming languages.
 
 - **Container Format**: Defined in [file_format.proto](database/src/main/proto/file_format.proto), it includes metadata like versioning and a collection of chunks. Each chunk is a byte stream with chunk-specific metadata, including optional encryption, signatures, compression algorithms, and vendor-specific metadata in a key-value map.
-- **Diagnostic Description Format**: Derived from the ODX-schema, and defined in [data_format.proto](database/src/main/proto/diagnostic_description.proto), it efficiently represents the ODX structures in a binary format, with simplifications and minor omissions to minimize size and maximize usability.
+- **Diagnostic Description Format**: Derived from the ODX-schema, and defined in [data_format.proto](database/src/main/proto/diagnostic_description.proto_), it efficiently represents the ODX structures in a binary format, with simplifications and minor omissions to minimize size and maximize usability.
 
 ### Limitations/Changes Compared to ODX 🚧
 

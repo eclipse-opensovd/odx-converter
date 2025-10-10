@@ -11,102 +11,112 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import org.eclipse.opensovd.cda.mdd.*
-import org.eclipse.opensovd.cda.mdd.DiagCodedType.MinMaxLengthType.Termination
-import org.eclipse.opensovd.cda.mdd.Param.ParamType
+import dataformat.Addressing
+import dataformat.ComParamStandardisationLevel
+import dataformat.ComParamUsage
+import dataformat.CompuCategory
+import dataformat.DataType
+import dataformat.DiagClassType
+import dataformat.DiagCodedTypeName
+import dataformat.IntervalType
+import dataformat.ParamType
+import dataformat.Radix
+import dataformat.TableEntryRowFragment
+import dataformat.Termination
+import dataformat.TransmissionMode
 import schema.odx.*
 
-fun TRANSMODE.toProtoBufEnum(): DiagService.TransmissionMode =
+fun TRANSMODE.toProtoBufEnum(): Byte =
     when (this) {
-        TRANSMODE.RECEIVE_ONLY -> DiagService.TransmissionMode.RECEIVE_ONLY
-        TRANSMODE.SEND_ONLY -> DiagService.TransmissionMode.SEND_ONLY
-        TRANSMODE.SEND_OR_RECEIVE -> DiagService.TransmissionMode.SEND_OR_RECEIVE
-        TRANSMODE.SEND_AND_RECEIVE -> DiagService.TransmissionMode.SEND_AND_RECEIVE
+        TRANSMODE.RECEIVE_ONLY -> TransmissionMode.RECEIVE_ONLY
+        TRANSMODE.SEND_ONLY -> TransmissionMode.SEND_ONLY
+        TRANSMODE.SEND_OR_RECEIVE -> TransmissionMode.SEND_OR_RECEIVE
+        TRANSMODE.SEND_AND_RECEIVE -> TransmissionMode.SEND_AND_RECEIVE
     }
 
-fun ADDRESSING.toProtoBufEnum(): DiagService.Addressing =
+fun ADDRESSING.toProtoBufEnum(): Byte =
     when (this) {
-        ADDRESSING.PHYSICAL -> DiagService.Addressing.PHYSICAL
-        ADDRESSING.FUNCTIONAL -> DiagService.Addressing.FUNCTIONAL
-        ADDRESSING.FUNCTIONAL_OR_PHYSICAL -> DiagService.Addressing.FUNCTIONAL_OR_PHYSICAL
+        ADDRESSING.PHYSICAL -> Addressing.PHYSICAL
+        ADDRESSING.FUNCTIONAL -> Addressing.FUNCTIONAL
+        ADDRESSING.FUNCTIONAL_OR_PHYSICAL -> Addressing.FUNCTIONAL_OR_PHYSICAL
     }
 
-fun INTERVALTYPE.toProtoBufEnum(): Limit.IntervalType =
+fun INTERVALTYPE.toProtoBufEnum(): Byte =
     when (this) {
-        INTERVALTYPE.OPEN -> Limit.IntervalType.OPEN
-        INTERVALTYPE.INFINITE -> Limit.IntervalType.INFINITE
-        INTERVALTYPE.CLOSED -> Limit.IntervalType.CLOSED
+        INTERVALTYPE.OPEN -> IntervalType.OPEN
+        INTERVALTYPE.INFINITE -> IntervalType.INFINITE
+        INTERVALTYPE.CLOSED -> IntervalType.CLOSED
     }
 
-fun COMPUCATEGORY.toProtoBufEnum(): CompuMethod.CompuCategory =
+fun COMPUCATEGORY.toProtoBufEnum(): Byte =
     when (this) {
-        COMPUCATEGORY.IDENTICAL -> CompuMethod.CompuCategory.IDENTICAL
-        COMPUCATEGORY.LINEAR -> CompuMethod.CompuCategory.LINEAR
-        COMPUCATEGORY.SCALE_LINEAR -> CompuMethod.CompuCategory.SCALE_LINEAR
-        COMPUCATEGORY.TEXTTABLE -> CompuMethod.CompuCategory.TEXT_TABLE
-        COMPUCATEGORY.COMPUCODE -> CompuMethod.CompuCategory.COMPU_CODE
-        COMPUCATEGORY.TAB_INTP -> CompuMethod.CompuCategory.TAB_INTP
-        COMPUCATEGORY.RAT_FUNC -> CompuMethod.CompuCategory.RAT_FUNC
-        COMPUCATEGORY.SCALE_RAT_FUNC -> CompuMethod.CompuCategory.SCALE_RAT_FUNC
+        COMPUCATEGORY.IDENTICAL -> CompuCategory.IDENTICAL
+        COMPUCATEGORY.LINEAR -> CompuCategory.LINEAR
+        COMPUCATEGORY.SCALE_LINEAR -> CompuCategory.SCALE_LINEAR
+        COMPUCATEGORY.TEXTTABLE -> CompuCategory.TEXT_TABLE
+        COMPUCATEGORY.COMPUCODE -> CompuCategory.COMPU_CODE
+        COMPUCATEGORY.TAB_INTP -> CompuCategory.TAB_INTP
+        COMPUCATEGORY.RAT_FUNC -> CompuCategory.RAT_FUNC
+        COMPUCATEGORY.SCALE_RAT_FUNC -> CompuCategory.SCALE_RAT_FUNC
     }
 
-fun PHYSICALDATATYPE.toProtoBufEnum(): PhysicalType.DataType =
+fun PHYSICALDATATYPE.toProtoBufEnum(): Byte =
     when (this) {
-        PHYSICALDATATYPE.A_INT_32 -> PhysicalType.DataType.A_INT_32
-        PHYSICALDATATYPE.A_UINT_32 -> PhysicalType.DataType.A_UINT_32
-        PHYSICALDATATYPE.A_FLOAT_32 -> PhysicalType.DataType.A_FLOAT_32
-        PHYSICALDATATYPE.A_FLOAT_64 -> PhysicalType.DataType.A_FLOAT_64
-        PHYSICALDATATYPE.A_BYTEFIELD -> PhysicalType.DataType.A_BYTEFIELD
-        PHYSICALDATATYPE.A_UNICODE_2_STRING -> PhysicalType.DataType.A_UNICODE_2_STRING
+        PHYSICALDATATYPE.A_INT_32 -> DataType.A_INT_32
+        PHYSICALDATATYPE.A_UINT_32 -> DataType.A_UINT_32
+        PHYSICALDATATYPE.A_FLOAT_32 -> DataType.A_FLOAT_32
+        PHYSICALDATATYPE.A_FLOAT_64 -> DataType.A_FLOAT_64
+        PHYSICALDATATYPE.A_BYTEFIELD -> DataType.A_BYTEFIELD
+        PHYSICALDATATYPE.A_UNICODE_2_STRING -> DataType.A_UNICODE_2_STRING
     }
 
-fun RADIX.toProtoBufEnum(): PhysicalType.Radix =
+fun RADIX.toProtoBufEnum(): Byte =
     when (this) {
-        RADIX.HEX -> PhysicalType.Radix.HEX
-        RADIX.OCT -> PhysicalType.Radix.OCT
-        RADIX.BIN -> PhysicalType.Radix.BIN
-        RADIX.DEC -> PhysicalType.Radix.DEC
+        RADIX.HEX -> Radix.HEX
+        RADIX.OCT -> Radix.OCT
+        RADIX.BIN -> Radix.BIN
+        RADIX.DEC -> Radix.DEC
     }
 
-fun TERMINATION.toProtoBufEnum(): Termination =
+fun TERMINATION.toProtoBufEnum(): Byte =
     when (this) {
         TERMINATION.ZERO -> Termination.ZERO
         TERMINATION.END_OF_PDU -> Termination.END_OF_PDU
         TERMINATION.HEX_FF -> Termination.HEX_FF
     }
 
-fun DIAGCODEDTYPE.toTypeEnum(): DiagCodedType.DiagCodedTypeName =
+fun DIAGCODEDTYPE.toTypeEnum(): Byte =
     when (this) {
-        is LEADINGLENGTHINFOTYPE -> DiagCodedType.DiagCodedTypeName.LEADING_LENGTH_INFO_TYPE
-        is MINMAXLENGTHTYPE -> DiagCodedType.DiagCodedTypeName.MIN_MAX_LENGTH_TYPE
-        is PARAMLENGTHINFOTYPE -> DiagCodedType.DiagCodedTypeName.PARAM_LENGTH_INFO_TYPE
-        is STANDARDLENGTHTYPE -> DiagCodedType.DiagCodedTypeName.STANDARD_LENGTH_TYPE
+        is LEADINGLENGTHINFOTYPE -> DiagCodedTypeName.LEADING_LENGTH_INFO_TYPE
+        is MINMAXLENGTHTYPE -> DiagCodedTypeName.MIN_MAX_LENGTH_TYPE
+        is PARAMLENGTHINFOTYPE -> DiagCodedTypeName.PARAM_LENGTH_INFO_TYPE
+        is STANDARDLENGTHTYPE -> DiagCodedTypeName.STANDARD_LENGTH_TYPE
         else -> throw IllegalStateException("Unknown diag coded type ${this::class.java.simpleName}")
     }
 
-fun DATATYPE.toProtoBufDiagCodedTypeEnum(): DiagCodedType.DataType =
+fun DATATYPE.toDiagCodedTypeEnum(): Byte =
     when (this) {
-        DATATYPE.A_ASCIISTRING -> DiagCodedType.DataType.A_ASCIISTRING
-        DATATYPE.A_UTF_8_STRING -> DiagCodedType.DataType.A_UTF_8_STRING
-        DATATYPE.A_UNICODE_2_STRING -> DiagCodedType.DataType.A_UNICODE_2_STRING
-        DATATYPE.A_BYTEFIELD -> DiagCodedType.DataType.A_BYTEFIELD
-        DATATYPE.A_INT_32 -> DiagCodedType.DataType.A_INT_32
-        DATATYPE.A_UINT_32 -> DiagCodedType.DataType.A_UINT_32
-        DATATYPE.A_FLOAT_32 -> DiagCodedType.DataType.A_FLOAT_32
-        DATATYPE.A_FLOAT_64 -> DiagCodedType.DataType.A_FLOAT_64
+        DATATYPE.A_ASCIISTRING -> DataType.A_ASCIISTRING
+        DATATYPE.A_UTF_8_STRING -> DataType.A_UTF_8_STRING
+        DATATYPE.A_UNICODE_2_STRING -> DataType.A_UNICODE_2_STRING
+        DATATYPE.A_BYTEFIELD -> DataType.A_BYTEFIELD
+        DATATYPE.A_INT_32 -> DataType.A_INT_32
+        DATATYPE.A_UINT_32 -> DataType.A_UINT_32
+        DATATYPE.A_FLOAT_32 -> DataType.A_FLOAT_32
+        DATATYPE.A_FLOAT_64 -> DataType.A_FLOAT_64
     }
 
-fun DIAGCLASSTYPE.toProtoBufEnum(): DiagComm.DiagClassType =
+fun DIAGCLASSTYPE.toProtoBufEnum(): Byte =
     when (this) {
-        DIAGCLASSTYPE.STARTCOMM -> DiagComm.DiagClassType.START_COMM
-        DIAGCLASSTYPE.DYN_DEF_MESSAGE -> DiagComm.DiagClassType.DYN_DEF_MESSAGE
-        DIAGCLASSTYPE.STOPCOMM -> DiagComm.DiagClassType.STOP_COMM
-        DIAGCLASSTYPE.READ_DYN_DEF_MESSAGE -> DiagComm.DiagClassType.READ_DYN_DEF_MESSAGE
-        DIAGCLASSTYPE.VARIANTIDENTIFICATION -> DiagComm.DiagClassType.VARIANT_IDENTIFICATION
-        DIAGCLASSTYPE.CLEAR_DYN_DEF_MESSAGE -> DiagComm.DiagClassType.CLEAR_DYN_DEF_MESSAGE
+        DIAGCLASSTYPE.STARTCOMM -> DiagClassType.START_COMM
+        DIAGCLASSTYPE.DYN_DEF_MESSAGE -> DiagClassType.DYN_DEF_MESSAGE
+        DIAGCLASSTYPE.STOPCOMM -> DiagClassType.STOP_COMM
+        DIAGCLASSTYPE.READ_DYN_DEF_MESSAGE -> DiagClassType.READ_DYN_DEF_MESSAGE
+        DIAGCLASSTYPE.VARIANTIDENTIFICATION -> DiagClassType.VARIANT_IDENTIFICATION
+        DIAGCLASSTYPE.CLEAR_DYN_DEF_MESSAGE -> DiagClassType.CLEAR_DYN_DEF_MESSAGE
     }
 
-fun PARAM.toParamTypeEnum(): ParamType =
+fun PARAM.toParamTypeEnum(): Byte =
     when (this) {
         is CODEDCONST -> ParamType.CODED_CONST
         is DYNAMIC -> ParamType.DYNAMIC
@@ -123,19 +133,26 @@ fun PARAM.toParamTypeEnum(): ParamType =
         else -> throw IllegalStateException("Unknown param type ${this::class.java.simpleName}")
     }
 
-fun STANDARDISATIONLEVEL.toProtoBufEnum(): ComParam.StandardisationLevel =
+fun STANDARDISATIONLEVEL.toProtoBufEnum(): Byte =
     when (this) {
-        STANDARDISATIONLEVEL.STANDARD -> ComParam.StandardisationLevel.STANDARD
-        STANDARDISATIONLEVEL.OPTIONAL -> ComParam.StandardisationLevel.OPTIONAL
-        STANDARDISATIONLEVEL.OEM_OPTIONAL -> ComParam.StandardisationLevel.OEM_OPTIONAL
-        STANDARDISATIONLEVEL.OEM_SPECIFIC -> ComParam.StandardisationLevel.OEM_SPECIFIC
+        STANDARDISATIONLEVEL.STANDARD -> ComParamStandardisationLevel.STANDARD
+        STANDARDISATIONLEVEL.OPTIONAL -> ComParamStandardisationLevel.OPTIONAL
+        STANDARDISATIONLEVEL.OEM_OPTIONAL -> ComParamStandardisationLevel.OEM_OPTIONAL
+        STANDARDISATIONLEVEL.OEM_SPECIFIC -> ComParamStandardisationLevel.OEM_SPECIFIC
     }
 
 
-fun USAGE.toProtoBufEnum(): ComParam.Usage =
+fun USAGE.toProtoBufEnum(): Byte =
     when (this) {
-        USAGE.TESTER -> ComParam.Usage.TESTER
-        USAGE.APPLICATION -> ComParam.Usage.APPLICATION
-        USAGE.ECU_COMM -> ComParam.Usage.ECU_COMM
-        USAGE.ECU_SOFTWARE -> ComParam.Usage.ECU_SOFTWARE
+        USAGE.TESTER -> ComParamUsage.TESTER
+        USAGE.APPLICATION -> ComParamUsage.APPLICATION
+        USAGE.ECU_COMM -> ComParamUsage.ECU_COMM
+        USAGE.ECU_SOFTWARE -> ComParamUsage.ECU_SOFTWARE
     }
+
+fun ROWFRAGMENT.toProtoBufEnum(): Byte =
+    when (this) {
+        ROWFRAGMENT.KEY -> TableEntryRowFragment.KEY
+        ROWFRAGMENT.STRUCT -> TableEntryRowFragment.STRUCT
+    }
+
