@@ -26,6 +26,7 @@ dependencies {
 
     implementation(libs.apache.compress)
     implementation(libs.tukaani.xz)
+    api(files("lib/flatbuffers-java-25.9.23.jar", "lib/flatbuffers-kotlin-jvm-2.0.0-SNAPSHOT.jar"))
 
     testImplementation(kotlin("test"))
 }
@@ -43,4 +44,10 @@ protobuf {
 }
 
 tasks.withType<GenerateProtoTask>().configureEach {
+}
+
+tasks.register<Exec>("generateFbs") {
+    val cmd = listOf("flatc", "--kotlin", "-o", "${projectDir.absolutePath}/src/main/kotlin", "${projectDir.absolutePath}/src/main/fbs/diagnostic_description.fbs")
+    logger.info("Executing ${cmd.joinToString(" ")}")
+    commandLine(cmd)
 }

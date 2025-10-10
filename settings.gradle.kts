@@ -44,3 +44,6 @@ dependencyResolutionManagement {
 rootProject.name = "odx_converter"
 include("database")
 include("converter")
+if (File(rootProject.projectDir, "viewer").exists()) {
+    include("viewer")
+}
