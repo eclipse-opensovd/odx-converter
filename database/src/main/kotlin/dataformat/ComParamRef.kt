@@ -28,17 +28,15 @@ class ComParamRef : Table() {
         __init(_i, _bb)
         return this
     }
-    val simpleValue : String?
-        get() {
-            val o = __offset(4)
-            return if (o != 0) {
-                __string(o + bb_pos)
-            } else {
-                null
-            }
+    val simpleValue : dataformat.SimpleValue? get() = simpleValue(dataformat.SimpleValue())
+    fun simpleValue(obj: dataformat.SimpleValue) : dataformat.SimpleValue? {
+        val o = __offset(4)
+        return if (o != 0) {
+            obj.__assign(__indirect(o + bb_pos), bb)
+        } else {
+            null
         }
-    val simpleValueAsByteBuffer : ByteBuffer get() = __vector_as_bytebuffer(4, 1)
-    fun simpleValueInByteBuffer(_bb: ByteBuffer) : ByteBuffer = __vector_in_bytebuffer(_bb, 4, 1)
+    }
     val complexValue : dataformat.ComplexValue? get() = complexValue(dataformat.ComplexValue())
     fun complexValue(obj: dataformat.ComplexValue) : dataformat.ComplexValue? {
         val o = __offset(6)
