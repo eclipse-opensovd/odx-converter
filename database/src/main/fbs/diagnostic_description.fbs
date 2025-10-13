@@ -729,7 +729,7 @@ table Protocol {
 }
 
 table ComParamRef {
-    simple_value: string;
+    simple_value: SimpleValue;
     complex_value: ComplexValue;
     com_param: ComParam;
     protocol: Protocol;

@@ -539,7 +539,7 @@ class DatabaseWriter(
 
                         CodedConst.startCodedConst(builder)
                         CodedConst.addDiagCodedType(builder, diagCodedType)
-                        codedValue?.let { CodedConst.addDiagCodedType(builder, it) }
+                        codedValue?.let { CodedConst.addCodedValue(builder, it) }
                         CodedConst.endCodedConst(builder)
                     }
 
@@ -1485,7 +1485,7 @@ class DatabaseWriter(
 
         DiagComm.startDiagComm(builder)
         DiagComm.addShortName(builder, shortName)
-        longName?.let { DiagComm.addShortName(builder, it) }
+        longName?.let { DiagComm.addLongName(builder, it) }
         diagClass?.let { DiagComm.addDiagClassType(builder, it) }
         functClasses?.let { DiagComm.addFunctClass(builder, it) }
         semantic?.let { DiagComm.addSemantic(builder, it) }
