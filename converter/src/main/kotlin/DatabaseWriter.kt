@@ -358,6 +358,12 @@ class DatabaseWriter(
                 TableDop.createRowsVector(builder, it)
             }
 
+            val diagCommConnectors = this.tablediagcommconnectors?.tablediagcommconnector?.map {
+                it.offset()
+            }?.toIntArray()?.let {
+                TableDop.createDiagCommConnectorVector(builder, it)
+            }
+
             TableDop.startTableDop(builder)
             TableDop.addShortName(builder, shortName)
             semantic?.let { TableDop.addSemantic(builder, it) }
@@ -365,13 +371,8 @@ class DatabaseWriter(
             keyLabel?.let { TableDop.addKeyLabel(builder, it) }
             keyDop?.let { TableDop.addKeyDop(builder, it) }
             structLabel?.let { TableDop.addStructLabel(builder, it) }
-
+            diagCommConnectors?.let { TableDop.addDiagCommConnector(builder, it) }
             TableDop.addRows(builder, rows)
-
-            // TODO Diag comms
-//            table.addAllDiagCommConnector(
-//                this.tablediagcommconnectors?.tablediagcommconnector?.map { it.offset() } ?: emptyList()
-//            )
 
             sdgs?.let { TableDop.addSdgs(builder, it) }
 
@@ -422,39 +423,48 @@ class DatabaseWriter(
             SD.endSD(builder)
         }
 
+    private fun schema.odx.SDGCAPTION.offset(): Int =
+        cachedObjects.getOrPut(this) {
+            val shortName = this.shortname.offset()
+
+            SDGCaption.startSDGCaption(builder)
+            SDGCaption.addShortName(builder, shortName)
+            SDGCaption.endSDGCaption(builder)
+        }
+
     private fun schema.odx.SDG.offset(): Int =
         cachedObjects.getOrPut(this) {
             val si = this.si?.offset()
 
-            val caption = this.sdgcaption?.shortname?.let {
-                val shortName = it.offset()
+            val caption = this.sdgcaption?.offset() ?: this.sdgcaptionref?.idref?.let {
+                val sdgCaption = odx.sdgCaptions[it] ?: throw IllegalStateException("Couldn't find sdg-caption $it")
+                sdgCaption
+            }?.offset()
 
-                SDGCaption.startSDGCaption(builder)
-                SDGCaption.addShortName(builder, shortName)
-                SDGCaption.endSDGCaption(builder)
-            }
-
-            val sdg = SDG.createSdsVector(builder, this.sdgOrSD.map {
+            val sdg = this.sdgOrSD?.map {
                 val sdOrSdg = when (it) {
                     is schema.odx.SD -> it.offset()
                     is schema.odx.SDG -> it.offset()
                     else -> throw IllegalArgumentException("Unknown sdg type: $it")
                 }
-                SDOrSDG.startSDOrSDG(builder)
-                SDOrSDG.addSdOrSdg(builder, sdOrSdg)
-                when (it) {
-                    is schema.odx.SD -> SDOrSDG.addSdOrSdgType(builder, SDxorSDG.SD)
-                    is schema.odx.SDG -> SDOrSDG.addSdOrSdgType(builder, SDxorSDG.SDG)
+                val sdOrSdgType = when (it) {
+                    is schema.odx.SD -> SDxorSDG.SD
+                    is schema.odx.SDG -> SDxorSDG.SDG
                     else -> error("This path should never be reached -- unknown object type in SDOrSDG list $it")
                 }
+
+                SDOrSDG.startSDOrSDG(builder)
+                SDOrSDG.addSdOrSdg(builder, sdOrSdg)
+                SDOrSDG.addSdOrSdgType(builder, sdOrSdgType)
                 SDOrSDG.endSDOrSDG(builder)
-            }.toIntArray())
+            }?.toIntArray()?.let {
+                SDG.createSdsVector(builder, it)
+            }
 
             SDG.startSDG(builder)
             si?.let { SDG.addSi(builder, it) }
             caption?.let { SDG.addCaption(builder, it) }
-            sdg.let { SDG.addSds(builder, it) }
-
+            sdg?.let { SDG.addSds(builder, it) }
             SDG.endSDG(builder)
         }
 
@@ -730,7 +740,7 @@ class DatabaseWriter(
             FunctClass.endFunctClass(builder)
         }
 
-    private fun STANDARDLENGTHTYPE.offsetType(): Int {
+    private fun STANDARDLENGTHTYPE.toStandardLengthType(): Int {
         val bitmask = this.bitmask?.offset()
 
         StandardLengthType.startStandardLengthType(builder)
@@ -743,7 +753,7 @@ class DatabaseWriter(
         return StandardLengthType.endStandardLengthType(builder)
     }
 
-    private fun MINMAXLENGTHTYPE.offsetType(): Int {
+    private fun MINMAXLENGTHTYPE.toMinMaxLengthType(): Int {
         MinMaxLengthType.startMinMaxLengthType(builder)
         MinMaxLengthType.addMinLength(builder, this.minlength.toUInt())
         this.maxlength?.let {
@@ -755,13 +765,13 @@ class DatabaseWriter(
         return MinMaxLengthType.endMinMaxLengthType(builder)
     }
 
-    private fun LEADINGLENGTHINFOTYPE.offsetType(): Int {
+    private fun LEADINGLENGTHINFOTYPE.toLeadingLengthInfoType(): Int {
         LeadingLengthInfoType.startLeadingLengthInfoType(builder)
         LeadingLengthInfoType.addBitLength(builder, this.bitlength.toUInt())
         return LeadingLengthInfoType.endLeadingLengthInfoType(builder)
     }
 
-    private fun PARAMLENGTHINFOTYPE.offsetType(): Int {
+    private fun PARAMLENGTHINFOTYPE.toParamLengthInfoType(): Int {
         val lengthKey = odx.lengthKeys[this.lengthkeyref.idref]?.offset()
             ?: throw IllegalStateException("Unknown length key reference ${this.lengthkeyref.idref}")
 
@@ -793,10 +803,10 @@ class DatabaseWriter(
             val baseTypeEncoding = this.basetypeencoding?.offset()
 
             val specificData = when (this) {
-                is STANDARDLENGTHTYPE -> this.offsetType()
-                is MINMAXLENGTHTYPE -> this.offsetType()
-                is LEADINGLENGTHINFOTYPE -> this.offsetType()
-                is PARAMLENGTHINFOTYPE -> this.offsetType()
+                is STANDARDLENGTHTYPE -> this.toStandardLengthType()
+                is MINMAXLENGTHTYPE -> this.toMinMaxLengthType()
+                is LEADINGLENGTHINFOTYPE -> this.toLeadingLengthInfoType()
+                is PARAMLENGTHINFOTYPE -> this.toParamLengthInfoType()
                 else -> {
                     throw IllegalStateException("Unsupported diag coded type ${this::class.java.simpleName}")
                 }

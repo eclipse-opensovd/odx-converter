@@ -18,73 +18,99 @@ import com.github.ajalt.clikt.parameters.types.file
 import dataformat.EcuData
 import dataformat.SD
 import dataformat.SDG
-import dataformat.SDOrSDG
+import dataformat.SDGS
 import dataformat.SDxorSDG
 import org.apache.commons.compress.compressors.lzma.LZMACompressorInputStream
 import org.eclipse.opensovd.cda.mdd.Chunk
 import org.eclipse.opensovd.cda.mdd.MDDFile
+import java.io.PrintStream
+import java.lang.System
 import java.nio.ByteBuffer
 import kotlin.time.measureTime
 
 class Viewer : CliktCommand() {
     val file by argument(name = "file").file(
-            mustExist = true,
-            canBeFile = true,
-            canBeDir = false,
-            mustBeWritable = false,
-            mustBeReadable = true
-        )
+        mustExist = true,
+        canBeFile = true,
+        canBeDir = false,
+        mustBeWritable = false,
+        mustBeReadable = true
+    )
 
     override fun run() {
         val mddFile: MDDFile
 
         lateinit var ecuData: EcuData
 
-        val readAndDecompressTime = measureTime {
-            val inputStream = file.inputStream()
+        val inputStream = file.inputStream()
 
-            if (inputStream.available() < FILE_MAGIC.size) {
-                throw IllegalArgumentException("Not an MDD file")
-            }
+        if (inputStream.available() < FILE_MAGIC.size) {
+            throw IllegalArgumentException("Not an MDD file")
+        }
 
-            val magic = inputStream.readNBytes(FILE_MAGIC.size)
+        val magic = inputStream.readNBytes(FILE_MAGIC.size)
 
-            if (!magic.contentEquals(FILE_MAGIC)) {
-                throw IllegalArgumentException("Not an MDD file")
-            }
+        if (!magic.contentEquals(FILE_MAGIC)) {
+            throw IllegalArgumentException("Not an MDD file")
+        }
 
-            mddFile = MDDFile.parser().parseFrom(inputStream)
+        mddFile = MDDFile.parser().parseFrom(inputStream)
 
-            val diagnosticDescription =
-                mddFile.chunksList.first { chunk -> chunk.type.equals(Chunk.DataType.DIAGNOSTIC_DESCRIPTION) }.data
+        val diagnosticDescription =
+            mddFile.chunksList.first { chunk -> chunk.type.equals(Chunk.DataType.DIAGNOSTIC_DESCRIPTION) }.data
 
+        lateinit var data: ByteBuffer
+        val decompressTime = measureTime {
             LZMACompressorInputStream(diagnosticDescription.newInput()).use { inputStream ->
-                val bb = ByteBuffer.wrap(inputStream.readAllBytes())
-                ecuData = EcuData.getRootAsEcuData(bb)
-                for (i in 0 until ecuData.dtcsLength) {
-                    val dtc = ecuData.dtcs(i) ?: throw IllegalStateException("dtc must exist")
-                    println(dtc.displayTroubleCode)
-                    dtc.sdgs?.let {
-                        for (j in 0 until it.sdgsLength) {
-                            val sdg = it.sdgs(j) ?: throw IllegalStateException("sdg must exist")
-                            println(sdg.caption)
-                            for (k in 0 until sdg.sdsLength) {
-                                val sdOrSdg = sdg.sds(k) ?: throw IllegalStateException("sdOrSdg must exist")
-                                val obj = when (sdOrSdg.sdOrSdgType) {
-                                    SDxorSDG.SD -> sdOrSdg.sdOrSdg(SD())
-                                    SDxorSDG.SDG -> sdOrSdg.sdOrSdg(SDG())
-                                    else -> throw IllegalStateException("sdOrSdg must be valid")
-                                }
-                                println(obj)
-                            }
-                        }
-                    }
-                }
+                data = ByteBuffer.wrap(inputStream.readAllBytes())
+            }
+        }
+        println("Decompression took ${decompressTime.inWholeMilliseconds} ms")
+
+        ecuData = EcuData.getRootAsEcuData(data)
+
+        val o = System.out
+
+        for (i in 0 until ecuData.dtcsLength) {
+            val dtc = ecuData.dtcs(i) ?: throw IllegalStateException("dtc must exist")
+            o.indentedPrintln(0, dtc.displayTroubleCode)
+            dtc.sdgs?.output(o, 2)
+        }
+    }
+
+    private fun SDGS.output(p: PrintStream, indent: Int) {
+        for (i in 0 until this.sdgsLength) {
+            val o = this.sdgs(i)
+            o?.output(p, indent + 2)
+        }
+    }
+
+    private fun SD.output(p: PrintStream, indent: Int) {
+        p.indentedPrintln(indent, "${this.value} (si: ${this.si} ti: ${this.ti})")
+    }
+
+    private fun SDG.output(p: PrintStream, indent: Int) {
+        this.caption?.shortName?.let {
+            p.indentedPrintln(indent, "$it:")
+        }
+
+        for (i in 0 until this.sdsLength) {
+            val sdOrSdg = this.sds(i) ?: throw IllegalStateException("sdOrSdg must exist")
+            val obj = when (sdOrSdg.sdOrSdgType) {
+                SDxorSDG.SD -> sdOrSdg.sdOrSdg(SD())
+                SDxorSDG.SDG -> sdOrSdg.sdOrSdg(SDG())
+                else -> throw IllegalStateException("sdOrSdg must be valid")
+            }
+            when (obj) {
+                is SD -> obj.output(p, indent + 2)
+                is SDG -> obj.output(p, indent + 2)
             }
         }
 
-        println("Took ${readAndDecompressTime.inWholeMilliseconds} ms to read and decompress")
+    }
 
+    fun PrintStream.indentedPrintln(indent: Int, value: String?) {
+        this.println(" ".repeat(indent) + value)
     }
 }
 

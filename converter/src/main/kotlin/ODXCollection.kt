@@ -55,6 +55,7 @@ import schema.odx.REQUEST
 import schema.odx.RESPONSE
 import schema.odx.SD
 import schema.odx.SDG
+import schema.odx.SDGCAPTION
 import schema.odx.SDGS
 import schema.odx.SINGLEECUJOB
 import schema.odx.STATE
@@ -372,6 +373,10 @@ class ODXCollection(val data: Map<String, ODX>) {
         val sds = sdgss.flatMap { it.sdg }.flatMap { it.sdgOrSD.filterIsInstance<SD>() }
 
         sds.toSet()
+    }
+
+    val sdgCaptions: Map<String, SDGCAPTION> by lazy {
+        sdgs.mapNotNull { it.sdgcaption }.associateBy { it.id }
     }
 
     val sdgs: Set<SDG> by lazy {
