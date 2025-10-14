@@ -2052,10 +2052,10 @@ class DatabaseWriter(
                         ?: throw IllegalStateException("Couldn't find com param spec ${it.idref}")
                 comParamSpec.offset()
             }
-            val protStack = this.protstacksnref?.let {
+            val protStack = this.protstacksnref?.let { protStack ->
                 val stack = odx.comparamSpecs.values.flatMap { it.protstacks?.protstack ?: emptyList() }
-                    .firstOrNull { it.shortname == it.shortname }
-                    ?: throw IllegalStateException("Couldn't find protstack with short name ${it.shortname}")
+                    .firstOrNull { it.shortname == protStack.shortname }
+                    ?: throw IllegalStateException("Couldn't find protstack with short name ${protStack.shortname}")
                 stack.offset()
             }
             if (this.parentrefs != null) {

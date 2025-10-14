@@ -60,6 +60,7 @@ fun convert(inputFile: File, outputFile: File, logger: Logger, options: Converte
 
     val inputFileData = mutableMapOf<String, ByteArray>()
 
+    var odxRawSize = 0
     val readParseFileDuration = measureTime {
         ZipFile(inputFile).use { zip ->
             zip.entries().toList().forEach { entry ->
@@ -77,6 +78,7 @@ fun convert(inputFile: File, outputFile: File, logger: Logger, options: Converte
             if (!entry.key.contains(".odx")) {
                 return@forEach
             }
+            odxRawSize += entry.value.size
             val odx = unmarshaller.unmarshal(
                 XMLInputFactory.newFactory().createXMLEventReader(ByteArrayInputStream(entry.value)),
                 ODX::class.java
@@ -119,7 +121,7 @@ fun convert(inputFile: File, outputFile: File, logger: Logger, options: Converte
 
 
     val sizeCompressed = outputFile.toPath().fileSize()
-    logger.info("Writing database took $writingDuration total (compression: $compressionDuration) - size uncompressed: ${sizeUncompressed.format()} bytes, compressed: ${sizeCompressed.format()} bytes - ratio: ${(sizeUncompressed.toFloat() / sizeCompressed).format()} ")
+    logger.info("Writing database took $writingDuration total (compression: $compressionDuration) - sizes: odx raw: ${odxRawSize.format()} bytes, uncompressed flatbuffers: ${sizeUncompressed.format()} bytes, compressed flatbuffers: ${sizeCompressed.format()} bytes - ratio: ${(sizeUncompressed.toFloat() / sizeCompressed).format()} ")
 }
 
 fun createJobsChunks(
