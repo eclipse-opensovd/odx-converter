@@ -630,7 +630,7 @@ class DatabaseWriter(
                         dataformat.System.startSystem(builder)
 
                         dataformat.System.addSysParam(builder, sysParam)
-                        dop?.let { dataformat.System.addSysParam(builder, it) }
+                        dop?.let { dataformat.System.addDop(builder, it) }
 
                         dataformat.System.endSystem(builder)
                     }
@@ -652,7 +652,7 @@ class DatabaseWriter(
                                 tableKeyReference = row.offset()
                                 tableKeyReferenceType = TableKeyReference.TableRow
                             } else {
-                                tableKeyReference = 0 // TODO table.offset()
+                                tableKeyReference = table.offset();
                                 tableKeyReferenceType = TableKeyReference.TableDop
                             }
                         } else {
