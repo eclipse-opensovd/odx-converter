@@ -1562,14 +1562,23 @@ class DatabaseWriter(
             ?: throw IllegalStateException("Couldn't find reference ${it.idref}")
         } ?: emptyList()
 
-        val diagServices = resolvedLinks.filterIsInstance<DIAGSERVICE>().map {
+        val diagServicesRaw = resolvedLinks.filterIsInstance<DIAGSERVICE>().map {
             it.offset()
-        }.toIntArray().let {
+        } + (this.diagcomms?.diagcommproxy?.filterIsInstance<DIAGSERVICE>()?.map {
+            it.offset()
+        } ?: emptyList())
+
+        val diagServices = diagServicesRaw.toIntArray().let {
             DiagLayer.createDiagServicesVector(builder, it)
         }
-        val singleEcuJobs = resolvedLinks.filterIsInstance<SINGLEECUJOB>().map {
+
+        val singleEcuJobsRaw = resolvedLinks.filterIsInstance<SINGLEECUJOB>().map {
             it.offset()
-        }.toIntArray().let {
+        } + (this.diagcomms?.diagcommproxy?.filterIsInstance<SINGLEECUJOB>()?.map {
+            it.offset()
+        } ?: emptyList())
+
+        val singleEcuJobs = singleEcuJobsRaw.toIntArray().let {
             DiagLayer.createSingleEcuJobsVector(builder, it)
         }
         val stateCharts = statecharts?.statechart?.map {

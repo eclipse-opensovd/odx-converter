@@ -71,6 +71,15 @@ class Viewer : CliktCommand() {
 
         val o = System.out
 
+        for (i in 0 until ecuData.variantsLength) {
+            val variant = ecuData.variants(i)
+            println("Variant: ${variant?.diagLayer?.shortName}")
+            for (j in 0 until (variant?.diagLayer?.diagServicesLength ?: 0)) {
+                val service = variant?.diagLayer?.diagServices(j)
+                println(service?.diagComm?.shortName)
+            }
+        }
+
         for (i in 0 until ecuData.dtcsLength) {
             val dtc = ecuData.dtcs(i) ?: throw IllegalStateException("dtc must exist")
             o.indentedPrintln(0, dtc.displayTroubleCode)
