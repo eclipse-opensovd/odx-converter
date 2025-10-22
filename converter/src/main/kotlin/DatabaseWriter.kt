@@ -946,7 +946,7 @@ class DatabaseWriter(
         paramShortName?.let { EnvDataDesc.addParamShortName(builder, it) }
         paramShortNamePath?.let { EnvDataDesc.addParamPathShortName(builder, it) }
 
-        return EnvData.endEnvData(builder)
+        return EnvDataDesc.endEnvDataDesc(builder)
     }
 
     private fun PHYSICALTYPE.offset(): Int =
