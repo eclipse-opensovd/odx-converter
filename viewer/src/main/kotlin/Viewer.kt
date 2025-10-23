@@ -23,8 +23,8 @@ import dataformat.SDxorSDG
 import org.apache.commons.compress.compressors.lzma.LZMACompressorInputStream
 import org.eclipse.opensovd.cda.mdd.Chunk
 import org.eclipse.opensovd.cda.mdd.MDDFile
+import java.io.ByteArrayOutputStream
 import java.io.PrintStream
-import java.lang.System
 import java.nio.ByteBuffer
 import kotlin.time.measureTime
 
@@ -69,14 +69,15 @@ class Viewer : CliktCommand() {
 
         ecuData = EcuData.getRootAsEcuData(data)
 
-        val o = System.out
+        val bo = ByteArrayOutputStream()
+        val o = PrintStream(bo)
 
         for (i in 0 until ecuData.variantsLength) {
             val variant = ecuData.variants(i)
-            println("Variant: ${variant?.diagLayer?.shortName}")
+            o.indentedPrintln(0, "Variant: ${variant?.diagLayer?.shortName}")
             for (j in 0 until (variant?.diagLayer?.diagServicesLength ?: 0)) {
                 val service = variant?.diagLayer?.diagServices(j)
-                println(service?.diagComm?.shortName)
+                o.indentedPrintln(2, service?.diagComm?.shortName)
             }
         }
 
@@ -85,6 +86,8 @@ class Viewer : CliktCommand() {
             o.indentedPrintln(0, dtc.displayTroubleCode)
             dtc.sdgs?.output(o, 2)
         }
+
+        println(bo.toString())
     }
 
     private fun SDGS.output(p: PrintStream, indent: Int) {
@@ -99,7 +102,7 @@ class Viewer : CliktCommand() {
     }
 
     private fun SDG.output(p: PrintStream, indent: Int) {
-        this.caption?.shortName?.let {
+        this.captionSn?.let {
             p.indentedPrintln(indent, "$it:")
         }
 

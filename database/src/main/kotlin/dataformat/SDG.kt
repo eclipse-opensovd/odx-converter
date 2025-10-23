@@ -28,15 +28,17 @@ class SDG : Table() {
         __init(_i, _bb)
         return this
     }
-    val caption : dataformat.SDGCaption? get() = caption(dataformat.SDGCaption())
-    fun caption(obj: dataformat.SDGCaption) : dataformat.SDGCaption? {
-        val o = __offset(4)
-        return if (o != 0) {
-            obj.__assign(__indirect(o + bb_pos), bb)
-        } else {
-            null
+    val captionSn : String?
+        get() {
+            val o = __offset(4)
+            return if (o != 0) {
+                __string(o + bb_pos)
+            } else {
+                null
+            }
         }
-    }
+    val captionSnAsByteBuffer : ByteBuffer get() = __vector_as_bytebuffer(4, 1)
+    fun captionSnInByteBuffer(_bb: ByteBuffer) : ByteBuffer = __vector_in_bytebuffer(_bb, 4, 1)
     fun sds(j: Int) : dataformat.SDOrSDG? = sds(dataformat.SDOrSDG(), j)
     fun sds(obj: dataformat.SDOrSDG, j: Int) : dataformat.SDOrSDG? {
         val o = __offset(6)
@@ -68,15 +70,15 @@ class SDG : Table() {
             _bb.order(ByteOrder.LITTLE_ENDIAN)
             return (obj.__assign(_bb.getInt(_bb.position()) + _bb.position(), _bb))
         }
-        fun createSDG(builder: FlatBufferBuilder, captionOffset: Int, sdsOffset: Int, siOffset: Int) : Int {
+        fun createSDG(builder: FlatBufferBuilder, captionSnOffset: Int, sdsOffset: Int, siOffset: Int) : Int {
             builder.startTable(3)
             addSi(builder, siOffset)
             addSds(builder, sdsOffset)
-            addCaption(builder, captionOffset)
+            addCaptionSn(builder, captionSnOffset)
             return endSDG(builder)
         }
         fun startSDG(builder: FlatBufferBuilder) = builder.startTable(3)
-        fun addCaption(builder: FlatBufferBuilder, caption: Int) = builder.addOffset(0, caption, 0)
+        fun addCaptionSn(builder: FlatBufferBuilder, captionSn: Int) = builder.addOffset(0, captionSn, 0)
         fun addSds(builder: FlatBufferBuilder, sds: Int) = builder.addOffset(1, sds, 0)
         fun createSdsVector(builder: FlatBufferBuilder, data: IntArray) : Int {
             builder.startVector(4, data.size, 4)
