@@ -84,7 +84,6 @@ import dataformat.Response
 import dataformat.ResponseType
 import dataformat.SD
 import dataformat.SDG
-import dataformat.SDGCaption
 import dataformat.SDGS
 import dataformat.SDOrSDG
 import dataformat.SDxorSDG
@@ -423,22 +422,13 @@ class DatabaseWriter(
             SD.endSD(builder)
         }
 
-    private fun schema.odx.SDGCAPTION.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-
-            SDGCaption.startSDGCaption(builder)
-            SDGCaption.addShortName(builder, shortName)
-            SDGCaption.endSDGCaption(builder)
-        }
-
     private fun schema.odx.SDG.offset(): Int =
         cachedObjects.getOrPut(this) {
             val si = this.si?.offset()
 
-            val caption = this.sdgcaption?.offset() ?: this.sdgcaptionref?.idref?.let {
+            val caption = this.sdgcaption?.shortname?.offset() ?: this.sdgcaptionref?.idref?.let {
                 val sdgCaption = odx.sdgCaptions[it] ?: throw IllegalStateException("Couldn't find sdg-caption $it")
-                sdgCaption
+                sdgCaption.shortname
             }?.offset()
 
             val sdg = this.sdgOrSD?.map {
@@ -463,7 +453,7 @@ class DatabaseWriter(
 
             SDG.startSDG(builder)
             si?.let { SDG.addSi(builder, it) }
-            caption?.let { SDG.addCaption(builder, it) }
+            caption?.let { SDG.addCaptionSn(builder, it) }
             sdg?.let { SDG.addSds(builder, it) }
             SDG.endSDG(builder)
         }

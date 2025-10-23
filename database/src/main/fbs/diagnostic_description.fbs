@@ -30,12 +30,8 @@ table SDOrSDG {
     sd_or_sdg: SDxorSDG;
 }
 
-table SDGCaption {
-    short_name: string;
-}
-
 table SDG {
-    caption: SDGCaption;
+    caption_sn: string;
     sds: [SDOrSDG];
     si: string;
 }
