@@ -69,10 +69,9 @@ import schema.odx.TABLEKEY
 import schema.odx.TABLEROW
 import schema.odx.UNIT
 import schema.odx.UNITSPEC
-import schema.odx.VALUE
 import kotlin.collections.plus
 
-class ODXCollection(val data: Map<String, ODX>) {
+class ODXCollection(val data: Map<String, ODX>, val rawSize: Int) {
     val ecuName: String by lazy {
         baseVariantODX.diaglayercontainer?.basevariants?.basevariant?.first()?.shortname
             ?: throw IllegalStateException("No base variant")

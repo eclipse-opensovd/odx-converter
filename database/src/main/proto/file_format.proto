@@ -52,10 +52,10 @@ message Chunk {
 
   enum DataType {
     DIAGNOSTIC_DESCRIPTION = 0;
-    // A JAR file associated with the diagnostic description, may be referenced by single ecu jobs, and data from them might be needed in the CDA
-    JAR_FILE = 1;
-    // Files included in a jar-file. name of chunk is: "<jar-file>::<path-in-jar>"
-    JAR_FILE_PARTIAL = 2;
+    // A code file associated with the diagnostic description, may be referenced by single ecu jobs, and data from them might be needed in the CDA
+    CODE_FILE = 1;
+    // Files included in a code-file. name of chunk is: "<code-file>::<path-in-file>"
+    CODE_FILE_PARTIAL = 2;
     // file that gets embedded, could be an embedded odx-f, or a binary flashware, when the format is used for flashing
     EMBEDDED_FILE = 3;
 

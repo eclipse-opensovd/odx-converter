@@ -30,9 +30,6 @@ import java.io.BufferedOutputStream
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.StandardOpenOption
 import java.text.NumberFormat
 import java.time.Instant
 import java.util.concurrent.Executors
@@ -52,7 +49,13 @@ import kotlin.time.measureTime
 private val context: JAXBContext = org.eclipse.persistence.jaxb.JAXBContextFactory
     .createContext(arrayOf(ODX::class.java), null)
 
-fun convert(inputFile: File, outputFile: File, logger: Logger, options: ConverterOptions) {
+fun convert(
+    inputFile: File,
+    outputFile: File,
+    logger: Logger,
+    options: ConverterOptions,
+    stats: MutableList<ChunkStat>
+) {
     logger.info("Converting ${inputFile.name} to mdd")
     val unmarshaller = context.createUnmarshaller()
 
@@ -88,7 +91,7 @@ fun convert(inputFile: File, outputFile: File, logger: Logger, options: Converte
     }
     logger.fine("Reading and parsing into objects took $readParseFileDuration")
 
-    val odxCollection = ODXCollection(odxData)
+    val odxCollection = ODXCollection(odxData, odxRawSize)
 
     var sizeUncompressed: Long = 0
 
@@ -105,12 +108,12 @@ fun convert(inputFile: File, outputFile: File, logger: Logger, options: Converte
         // additional metadata?
 
         compressionDuration = measureTime {
-            val chunk = createEcuDataChunk(logger, odxCollection, options)
+            val chunk = createEcuDataChunk(logger, odxCollection, options, stats)
             mddFile.addChunks(chunk)
             sizeUncompressed = chunk.uncompressedSize
         }
-        mddFile.addAllChunks(createJobsChunks(logger, inputFileData, odxCollection, options))
-        mddFile.addAllChunks(createPartialChunks(logger, inputFileData, odxCollection, options))
+        mddFile.addAllChunks(createJobsChunks(logger, inputFileData, odxCollection, options, stats))
+        mddFile.addAllChunks(createPartialChunks(logger, inputFileData, odxCollection, options, stats))
 
         val mddFileOut = mddFile.build()
         BufferedOutputStream(outputFile.outputStream()).use {
@@ -128,7 +131,8 @@ fun createJobsChunks(
     logger: Logger,
     inputData: Map<String, ByteArray>,
     odx: ODXCollection,
-    options: ConverterOptions
+    options: ConverterOptions,
+    chunkStats: MutableList<ChunkStat>,
 ): List<Chunk> {
     if (!options.includeJobFiles) {
         return emptyList()
@@ -142,9 +146,16 @@ fun createJobsChunks(
             throw IllegalStateException("File $fileName is not included in PDX")
         } else {
             logger.info("Including $fileName (${data.size} bytes)")
+            chunkStats.add(ChunkStat(
+                chunkName = fileName,
+                chunkType = Chunk.DataType.CODE_FILE,
+                rawSize = null,
+                uncompressedSize = data.size.toLong(),
+                compressedSize = null,
+            ))
             Chunk.newBuilder()
                 .setName(fileName)
-                .setType(Chunk.DataType.JAR_FILE)
+                .setType(Chunk.DataType.CODE_FILE)
                 .setUncompressedSize(data.size.toLong())
                 .setData(ByteString.copyFrom(data))
                 .build()
@@ -156,7 +167,8 @@ fun createPartialChunks(
     logger: Logger,
     inputData: Map<String, ByteArray>,
     odx: ODXCollection,
-    options: ConverterOptions
+    options: ConverterOptions,
+    chunkStats: MutableList<ChunkStat>,
 ): List<Chunk> {
     if (options.partialJobFiles.isEmpty()) {
         return emptyList()
@@ -198,9 +210,17 @@ fun createPartialChunks(
                         val compressed = out.toByteArray()
                         logger.info("Including $filename from $jobFileName (${compressed.size} bytes compressed / ${data.size} bytes uncompressed)")
 
+                        chunkStats.add(ChunkStat(
+                            chunkName = "$jobFileName::$filename",
+                            chunkType = Chunk.DataType.CODE_FILE_PARTIAL,
+                            rawSize = null,
+                            uncompressedSize = data.size.toLong(),
+                            compressedSize = compressed.size.toLong(),
+                        ))
+
                         Chunk.newBuilder()
                             .setName("$jobFileName::$filename")
-                            .setType(Chunk.DataType.JAR_FILE_PARTIAL)
+                            .setType(Chunk.DataType.CODE_FILE_PARTIAL)
                             .setUncompressedSize(data.size.toLong())
                             .setCompressionAlgorithm("lzma")
                             .setData(ByteString.copyFrom(compressed))
@@ -238,7 +258,12 @@ data class PartialJobFilePattern(
     val partialFilePattern: PartialFilePattern,
 )
 
-fun createEcuDataChunk(logger: Logger, odxCollection: ODXCollection, options: ConverterOptions): Chunk {
+fun createEcuDataChunk(
+    logger: Logger,
+    odxCollection: ODXCollection,
+    options: ConverterOptions,
+    chunkStats: MutableList<ChunkStat>
+): Chunk {
     ByteString.newOutput().use { out ->
         var sizeUncompressed: Long
         LZMACompressorOutputStream(out).use { outputStream ->
@@ -248,7 +273,15 @@ fun createEcuDataChunk(logger: Logger, odxCollection: ODXCollection, options: Co
             countingOutputStream.write(data)
             sizeUncompressed = countingOutputStream.byteCount
         }
+        chunkStats.add(ChunkStat(
+            chunkName = odxCollection.ecuName,
+            chunkType = Chunk.DataType.DIAGNOSTIC_DESCRIPTION,
+            rawSize = odxCollection.rawSize.toLong(),
+            uncompressedSize = sizeUncompressed.toLong(),
+            compressedSize = out.size().toLong(),
+        ))
         return Chunk.newBuilder()
+            .setName(odxCollection.ecuName)
             .setType(Chunk.DataType.DIAGNOSTIC_DESCRIPTION)
             .setCompressionAlgorithm("lzma")
             .setUncompressedSize(sizeUncompressed)
@@ -285,6 +318,7 @@ class Converter : CliktCommand() {
     private var hadErrors: Boolean = false
 
     override fun run() {
+        val stats = mutableListOf<ChunkStat>()
         val executors = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
         pdxFiles.forEach { inputFile ->
             val outputDir = outputDir ?: inputFile.parentFile
@@ -314,7 +348,7 @@ class Converter : CliktCommand() {
                                         )
                                     },
                                 )
-                                convert(inputFile, outFile, logger, options)
+                                convert(inputFile, outFile, logger, options, stats)
                             } catch (e: Exception) {
                                 hadErrors = true
                                 logger.severe("Error while converting file ${inputFile.name}: ${e.message}", e)
@@ -333,6 +367,11 @@ class Converter : CliktCommand() {
         if (hadErrors) {
             exitProcess(1)
         }
+        val diagDescriptions = stats.filter { it.chunkType == Chunk.DataType.DIAGNOSTIC_DESCRIPTION }
+        val rawSize = diagDescriptions.sumOf { it.rawSize ?: 0 }
+        val uncompressedSize = diagDescriptions.sumOf { it.uncompressedSize }
+        val compressedSize = diagDescriptions.sumOf { it.compressedSize ?: 0 }
+        println("Processed ${diagDescriptions.size.format()} diagnostic description chunks: total raw size ${rawSize.format()}, total uncompressed size: ${uncompressedSize.format()}, compressed size: ${compressedSize.format()}")
     }
 }
 
