@@ -10,11 +10,11 @@ PDX files are essentially compressed archives of multiple ODX files, which follo
 
 Compression sizes vary, but here are some typical values:
 
-| ODX   | PDX   | MDD  |
-|-------|-------|------|
-| 66MB  | 3.6MB | 300k |
-| 154MB | 7.5MB | 653k |
-| 42MB  | 2.7MB | 202k |
+| Raw ODX | PDX    | MDD    |
+|---------|--------|--------|
+| 5.7 MB  | 1.4 MB | 111 kB |
+| 41 MB   | 2.7 MB | 470 kB |
+| 132 MB  | 5 MB   | 1.5 MB |
 
 ## Converter 🛠️
 
@@ -72,16 +72,29 @@ This will convert the given pdx files into mdd.
 
 ## File Format 📂
 
-The MDD format is defined using two protobuf files, ensuring compatibility across various programming languages.
+The MDD format itself is a container format defined using a [protobuf file](database/src/main/proto/file_format.proto), 
+ensuring compatibility across various programming languages. It includes metadata like versioning and a 
+collection of chunks. Each chunk is a byte stream with chunk-specific metadata, including optional encryption, 
+signatures, compression algorithms, and vendor-specific metadata in a key-value map.
 
-- **Container Format**: Defined in [file_format.proto](database/src/main/proto/file_format.proto), it includes metadata like versioning and a collection of chunks. Each chunk is a byte stream with chunk-specific metadata, including optional encryption, signatures, compression algorithms, and vendor-specific metadata in a key-value map.
-- **Diagnostic Description Format**: Derived from the ODX-schema, and defined in [data_format.proto](database/src/main/proto/diagnostic_description.proto_), it efficiently represents the ODX structures in a binary format, with simplifications and minor omissions to minimize size and maximize usability.
+For the diagnostic description, a compressed chunk within that container format is used, whose contents are defined using a
+[flatbuffers schema](database/src/main/fbs/diagnostic_description.fbs), to reduce the memory footprint and access times
+at runtime.
+
+## flatbuffers
+
+To regenerate the flatbuffers schema, the flatbuffers compiler in the version [25.9.23](https://github.com/google/flatbuffers/releases/tag/v25.9.23) is required. Please install it according to the instructions in
+the flatbuffers documentation, then you can run the gradle `generateFbs` task.
+
+Please note, that changing the flatbuffers version will make resulting
+mdd files incompatible with other flatbuffers versions, which will 
+cause issues when it isn't updated in the CDA as well.
 
 ### Limitations/Changes Compared to ODX 🚧
 
-- Data types (e.g., END-OF-PDU, LEADING-LENGTH-FIELD, STRUCTURE, MUX, DTC, etc.) are combined into a single message with a type and fields for the different data types, and composition is used instead of inheritance.
+- Data types (e.g., END-OF-PDU, LEADING-LENGTH-FIELD, STRUCTURE, MUX, DTC, etc.) are combined into a single message with 
+  a type and fields for the different data types, and composition is used instead of inheritance.
 - No support for cross-file references outside the pdx and runtime resolution
-- Most data is referenced via integer identifiers, the original text identifiers are discarded
 
 ### Language 💻
 
