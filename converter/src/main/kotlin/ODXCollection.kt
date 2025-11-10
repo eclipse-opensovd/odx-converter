@@ -11,74 +11,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import schema.odx.ADDITIONALAUDIENCE
-import schema.odx.AUDIENCE
-import schema.odx.BASEVARIANT
-import schema.odx.BASICSTRUCTURE
-import schema.odx.CODEDCONST
-import schema.odx.COMPARAM
-import schema.odx.COMPARAMSPEC
-import schema.odx.COMPARAMSUBSET
-import schema.odx.COMPLEXCOMPARAM
-import schema.odx.COMPUSCALE
-import schema.odx.DATAOBJECTPROP
-import schema.odx.DIAGCODEDTYPE
-import schema.odx.DIAGDATADICTIONARYSPEC
-import schema.odx.DIAGLAYERCONTAINER
-import schema.odx.DIAGSERVICE
-import schema.odx.DOPBASE
-import schema.odx.DTC
-import schema.odx.DTCDOP
-import schema.odx.DYNAMICENDMARKERFIELD
-import schema.odx.DYNAMICLENGTHFIELD
-import schema.odx.ECUSHAREDDATA
-import schema.odx.ECUVARIANT
-import schema.odx.ENDOFPDUFIELD
-import schema.odx.ENVDATA
-import schema.odx.ENVDATADESC
-import schema.odx.FUNCTCLASS
-import schema.odx.FUNCTIONALGROUP
-import schema.odx.GLOBALNEGRESPONSE
-import schema.odx.LENGTHKEY
-import schema.odx.LIBRARY
-import schema.odx.MUX
-import schema.odx.NEGRESPONSE
-import schema.odx.NRCCONST
-import schema.odx.ODX
-import schema.odx.PARAM
-import schema.odx.PHYSICALDIMENSION
-import schema.odx.POSRESPONSE
-import schema.odx.PRECONDITIONSTATEREF
-import schema.odx.PROTOCOL
-import schema.odx.PROTSTACK
-import schema.odx.REQUEST
-import schema.odx.RESPONSE
-import schema.odx.SD
-import schema.odx.SDG
-import schema.odx.SDGCAPTION
-import schema.odx.SDGS
-import schema.odx.SINGLEECUJOB
-import schema.odx.STATE
-import schema.odx.STATECHART
-import schema.odx.STATETRANSITION
-import schema.odx.STATETRANSITIONREF
-import schema.odx.STATICFIELD
-import schema.odx.STRUCTURE
-import schema.odx.TABLE
-import schema.odx.TABLEKEY
-import schema.odx.TABLEROW
-import schema.odx.UNIT
-import schema.odx.UNITSPEC
-import kotlin.collections.plus
+import schema.odx.*
 
 class ODXCollection(val data: Map<String, ODX>, val rawSize: Int) {
     val ecuName: String by lazy {
-        baseVariantODX.diaglayercontainer?.basevariants?.basevariant?.first()?.shortname
-            ?: throw IllegalStateException("No base variant")
+        val ecuName = baseVariantODX?.diaglayercontainer?.basevariants?.basevariant?.firstOrNull()?.shortname
+        ecuName
+            ?: if (functionalGroupODX != null) {
+                "functional_groups"
+            } else {
+                throw IllegalStateException("No base variant")
+            }
     }
+
     val odxRevision: String by lazy {
         // sort by date, or semantic version of revision?
-        baseVariantODX.diaglayercontainer?.admindata?.docrevisions?.docrevision?.lastOrNull()?.revisionlabel
+        baseVariantODX?.diaglayercontainer?.admindata?.docrevisions?.docrevision?.lastOrNull()?.revisionlabel
+            ?: functionalGroupODX?.diaglayercontainer?.admindata?.docrevisions?.docrevision?.lastOrNull()?.revisionlabel
             ?: throw IllegalStateException("No doc revisions")
     }
 
@@ -88,8 +37,12 @@ class ODXCollection(val data: Map<String, ODX>, val rawSize: Int) {
             .associateBy { it.id }
     }
 
-    val baseVariantODX: ODX by lazy {
-        data.values.first { it.diaglayercontainer?.basevariants?.basevariant != null }
+    val baseVariantODX: ODX? by lazy {
+        data.values.firstOrNull { it.diaglayercontainer?.basevariants?.basevariant != null }
+    }
+
+    val functionalGroupODX: ODX? by lazy {
+        data.values.firstOrNull { it.diaglayercontainer?.functionalgroups?.functionalgroup?.isNotEmpty() == true }
     }
 
     val ecuSharedDatas: Map<String, ECUSHAREDDATA> by lazy {

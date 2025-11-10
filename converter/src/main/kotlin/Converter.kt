@@ -244,7 +244,7 @@ fun extractMatchingFilesFromZip(
     var entry: ZipEntry? = zip.nextEntry
     while (entry != null) {
         logger.finest { "Checking ${entry?.name} against patterns $patterns" }
-        if (patterns.any { entry?.name?.matches(it) == true }) {
+        if (patterns.any { entry.name.matches(it) }) {
             files.add(Pair(entry.name, zip.readAllBytes()))
         }
         zip.closeEntry()
@@ -277,7 +277,7 @@ fun createEcuDataChunk(
             chunkName = odxCollection.ecuName,
             chunkType = Chunk.DataType.DIAGNOSTIC_DESCRIPTION,
             rawSize = odxCollection.rawSize.toLong(),
-            uncompressedSize = sizeUncompressed.toLong(),
+            uncompressedSize = sizeUncompressed,
             compressedSize = out.size().toLong(),
         ))
         return Chunk.newBuilder()

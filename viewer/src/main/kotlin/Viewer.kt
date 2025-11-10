@@ -16,10 +16,16 @@ import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.types.file
 import dataformat.EcuData
+import dataformat.EcuSharedData
+import dataformat.FunctionalGroup
+import dataformat.ParentRefType
+import dataformat.Protocol
 import dataformat.SD
 import dataformat.SDG
 import dataformat.SDGS
 import dataformat.SDxorSDG
+import dataformat.TableDop
+import dataformat.Variant
 import org.apache.commons.compress.compressors.lzma.LZMACompressorInputStream
 import org.eclipse.opensovd.cda.mdd.Chunk
 import org.eclipse.opensovd.cda.mdd.MDDFile
@@ -72,6 +78,8 @@ class Viewer : CliktCommand() {
         val bo = ByteArrayOutputStream()
         val o = PrintStream(bo)
 
+        o.indentedPrintln(0, "ECU: ${ecuData.ecuName} - Revision: ${ecuData.revision}")
+
         for (i in 0 until ecuData.variantsLength) {
             val variant = ecuData.variants(i)
             o.indentedPrintln(0, "Variant: ${variant?.diagLayer?.shortName}")
@@ -87,7 +95,44 @@ class Viewer : CliktCommand() {
             dtc.sdgs?.output(o, 2)
         }
 
+        for (i in 0 until ecuData.functionalGroupsLength) {
+            val fg = ecuData.functionalGroups(i) ?: throw IllegalStateException("functional group must exist")
+            fg.output(o, 0)
+        }
+
         println(bo.toString())
+    }
+
+    private fun FunctionalGroup.output(p: PrintStream, indent: Int) {
+        p.indentedPrintln(indent, this.diagLayer?.shortName + ":")
+        for (i in 0 until this.parentRefsLength) {
+            val parentRef = this.parentRefs(i)
+            val parent = when(parentRef?.refType) {
+                ParentRefType.FunctionalGroup -> parentRef.ref(FunctionalGroup())
+                ParentRefType.EcuSharedData -> parentRef.ref(EcuSharedData())
+                ParentRefType.TableDop -> parentRef.ref(TableDop())
+                ParentRefType.Protocol -> parentRef.ref(Protocol())
+                ParentRefType.Variant -> parentRef.ref(Variant())
+                else -> error("Unknown parentRefType ${parentRef?.refType}")
+            } ?: error("Unknown parentRefType ${parentRef.refType}")
+
+            p.indentedPrintln(indent + 2, "ParentRef #$i: (${parent::class.simpleName})")
+            if (parentRef.notInheritedDiagCommShortNamesLength > 0) {
+                p.indentedPrintln(indent + 4, "Not inherited diag comms: ${joinedStrings(parentRef.notInheritedDiagCommShortNamesLength, parentRef::notInheritedDiagCommShortNames)}")
+            }
+            if (parentRef.notInheritedTablesShortNamesLength > 0) {
+                p.indentedPrintln(indent + 4, "Not inherited tables: ${joinedStrings(parentRef.notInheritedTablesShortNamesLength, parentRef::notInheritedTablesShortNames)}")
+            }
+            if (parentRef.notInheritedDopsShortNamesLength > 0) {
+                p.indentedPrintln(indent + 4, "Not inherited dops: ${joinedStrings(parentRef.notInheritedDopsShortNamesLength, parentRef::notInheritedDopsShortNames)}")
+            }
+            if (parentRef.notInheritedGlobalNegResponsesShortNamesLength > 0) {
+                p.indentedPrintln(indent + 4, "Not inherited global neg responses: ${joinedStrings(parentRef.notInheritedGlobalNegResponsesShortNamesLength, parentRef::notInheritedGlobalNegResponsesShortNames)}")
+            }
+            if (parentRef.notInheritedVariablesShortNamesLength > 0) {
+                p.indentedPrintln(indent + 4, "Not inherited variables: ${joinedStrings(parentRef.notInheritedVariablesShortNamesLength, parentRef::notInheritedVariablesShortNames)}")
+            }
+        }
     }
 
     private fun SDGS.output(p: PrintStream, indent: Int) {
@@ -119,6 +164,17 @@ class Viewer : CliktCommand() {
             }
         }
 
+    }
+
+    private fun joinedStrings(length: Int, func: (Int) -> String?): String {
+        val sb = StringBuffer()
+        for (i in 0 until length) {
+            if (i > 0) {
+                sb.append(", ")
+            }
+            sb.append(func(i))
+        }
+        return sb.toString()
     }
 
     fun PrintStream.indentedPrintln(indent: Int, value: String?) {
