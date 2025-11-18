@@ -290,7 +290,7 @@ fun createEcuDataChunk(
     }
 }
 
-class Converter : CliktCommand() {
+class Converter : CliktCommand(name = "odx-converter") {
     val pdxFiles: List<File> by argument(name = "pdx-files")
         .file(mustExist = true, mustBeReadable = true, canBeFile = true)
         .help("pdx files to convert")
@@ -310,14 +310,23 @@ class Converter : CliktCommand() {
     val partialJobFiles: List<Pair<String, String>> by option("--partial-job-files")
         .help(
             "Include job files partially, and spread the contents as individual chunks. " +
-                    "Argument can be repeated, and are in the format: <regex for job-file-name pattern> <regex for content file-name pattern>."
+                    "Argument can be repeated, and is in the format: <regex for job-file-name pattern> <regex for content file-name pattern>."
         )
         .pair()
         .multiple()
 
+    val version: Boolean by option("-V", "--version")
+        .flag()
+
     private var hadErrors: Boolean = false
 
     override fun run() {
+        if (version) {
+            println("Version: " + ManifestReader.version)
+            println("Built: " + ManifestReader.buildDate)
+            println("Commit: " + ManifestReader.commitHash)
+            exitProcess(0)
+        }
         val stats = mutableListOf<ChunkStat>()
         val executors = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
         pdxFiles.forEach { inputFile ->
@@ -378,6 +387,13 @@ class Converter : CliktCommand() {
 fun Number.format(): String =
     NumberFormat.getNumberInstance().format(this)
 
-fun main(args: Array<String>) =
-    Converter().main(args)
+fun main(args: Array<String>) {
+    val converter = Converter()
+    println("${converter.commandName} - version: ${ManifestReader.version}\n")
+    if (args.isEmpty()) {
+        converter.main(arrayOf("--help"))
+    } else {
+        converter.main(args)
+    }
+}
 
