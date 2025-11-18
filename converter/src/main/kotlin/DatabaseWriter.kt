@@ -326,8 +326,8 @@ class DatabaseWriter(
             posResponses?.let { DiagService.addPosResponses(builder, it) }
             negResponses?.let { DiagService.addNegResponses(builder, it) }
             comParamRefs?.let { DiagService.addComParamRefs(builder, it) }
-            this.addressing?.let { DiagService.addAddressing(builder, it.toProtoBufEnum()) }
-            this.transmissionmode?.let { DiagService.addTransmissionMode(builder, it.toProtoBufEnum()) }
+            this.addressing?.let { DiagService.addAddressing(builder, it.toFileFormatEnum()) }
+            this.transmissionmode?.let { DiagService.addTransmissionMode(builder, it.toFileFormatEnum()) }
             DiagService.addIsCyclic(builder, this.isISCYCLIC)
             DiagService.addIsMultiple(builder, this.isISMULTIPLE)
             DiagService.endDiagService(builder)
@@ -657,7 +657,7 @@ class DatabaseWriter(
 
                     is TABLEENTRY -> {
                         val param = (this as PARAM).offset()
-                        val target = this.target?.toProtoBufEnum()
+                        val target = this.target?.toFileFormatEnum()
                         val tableRow = this.tablerowref.idref?.let {
                             val row = odx.tableRows[it] ?: throw IllegalStateException("Couldn't find TABLE-ROW $it")
                             row.offset()
@@ -750,7 +750,7 @@ class DatabaseWriter(
             MinMaxLengthType.addMaxLength(builder, this.maxlength.toUInt())
         }
         this.termination?.let {
-            MinMaxLengthType.addTermination(builder, this.termination.toProtoBufEnum())
+            MinMaxLengthType.addTermination(builder, this.termination.toFileFormatEnum())
         }
         return MinMaxLengthType.endMinMaxLengthType(builder)
     }
@@ -813,7 +813,7 @@ class DatabaseWriter(
             DiagCodedType.startDiagCodedType(builder)
 
             DiagCodedType.addType(builder, this.toTypeEnum())
-            DiagCodedType.addBaseDataType(builder, this.basedatatype.toDiagCodedTypeEnum())
+            DiagCodedType.addBaseDataType(builder, this.basedatatype.toFileFormatEnum())
             baseTypeEncoding?.let {
                 DiagCodedType.addBaseTypeEncoding(builder, it)
             }
@@ -943,9 +943,9 @@ class DatabaseWriter(
         cachedObjects.getOrPut(this) {
             PhysicalType.startPhysicalType(builder)
 
-            PhysicalType.addBaseDataType(builder, this.basedatatype.toProtoBufEnum())
+            PhysicalType.addBaseDataType(builder, this.basedatatype.toFileFormatEnum())
             this.precision?.let { PhysicalType.addPrecision(builder, it.toUInt()) }
-            this.displayradix?.let { PhysicalType.addDisplayRadix(builder, it.toProtoBufEnum()) }
+            this.displayradix?.let { PhysicalType.addDisplayRadix(builder, it.toFileFormatEnum()) }
 
             PhysicalType.endPhysicalType(builder)
         }
@@ -1010,7 +1010,7 @@ class DatabaseWriter(
 
             CompuMethod.startCompuMethod(builder)
 
-            this.category?.let { CompuMethod.addCategory(builder, it.toProtoBufEnum()) }
+            this.category?.let { CompuMethod.addCategory(builder, it.toFileFormatEnum()) }
             internalToPhys?.let { CompuMethod.addInternalToPhys(builder, it) }
             physToInternal?.let { CompuMethod.addPhysToInternal(builder, it) }
             CompuMethod.endCompuMethod(builder)
@@ -1123,7 +1123,7 @@ class DatabaseWriter(
 
             Limit.startLimit(builder)
             value?.let { Limit.addValue(builder, value) }
-            this.intervaltype?.let { Limit.addIntervalType(builder, it.toProtoBufEnum()) }
+            this.intervaltype?.let { Limit.addIntervalType(builder, it.toFileFormatEnum()) }
             Limit.endLimit(builder)
         }
 
@@ -1454,7 +1454,7 @@ class DatabaseWriter(
     private fun DIAGCOMM.offsetInternal(): Int {
         val shortName = this.shortname.offset()
         val longName = this.longname?.offset()
-        val diagClass = this.diagnosticclass?.toProtoBufEnum()
+        val diagClass = this.diagnosticclass?.toFileFormatEnum()
         val functClasses = this.functclassrefs?.functclassref?.map {
             val functClass =
                 odx.functClasses[it.idref] ?: throw IllegalStateException("Couldn't find funct class ${it.idref}")
@@ -1898,8 +1898,8 @@ class DatabaseWriter(
             val shortName = this.shortname.offset()
             val longName = this.longname?.offset()
             val paramClass = this.paramclass?.offset()
-            val comParamType = this.cptype?.toProtoBufEnum()
-            val comParamUsage = this.cpusage?.toProtoBufEnum()
+            val comParamType = this.cptype?.toFileFormatEnum()
+            val comParamUsage = this.cpusage?.toFileFormatEnum()
             val displayLevel = this.displaylevel?.toUInt()
 
             val regularComParam = this.let {
@@ -1970,8 +1970,8 @@ class DatabaseWriter(
             val shortName = this.shortname.offset()
             val longName = this.longname?.offset()
             val paramClass = this.paramclass?.offset()
-            val comParamType = this.cptype?.toProtoBufEnum()
-            val comParamUsage = this.cpusage?.toProtoBufEnum()
+            val comParamType = this.cptype?.toFileFormatEnum()
+            val comParamUsage = this.cpusage?.toFileFormatEnum()
             val displayLevel = this.displaylevel?.toUInt()
             val complexComParam = let {
                 val comParams = this.comparamOrCOMPLEXCOMPARAM?.map {
