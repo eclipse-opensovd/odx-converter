@@ -25,6 +25,11 @@ plugins {
 group = "org.eclipse.opensovd.cda.mdd"
 version = "0.1.0-SNAPSHOT"
 
+if (System.getenv("GITHUB_REF")?.contains("refs/tags/") == true) {
+    // When we build a tag from the pipeline, override the version with the tag name
+    version = System.getenv("GITHUB_REF_NAME")
+}
+
 allprojects {
     repositories {
         mavenCentral()

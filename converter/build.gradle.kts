@@ -11,6 +11,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import java.time.Clock
+import java.time.Instant
+
 plugins {
     kotlin("jvm")
     id("com.github.bjornvester.xjc") version libs.versions.xjc
@@ -38,7 +41,7 @@ dependencies {
     if (!odxSchema.exists()) {
         // You need to provide your own schema as src/main/resources/schema/odx_2_2_0.xsd
         //
-	// Alternatively it might be possible to provide the class files
+        // Alternatively it might be possible to provide the class files
         // taken from a different project like ODX-Commander, move them into
         // the schema.odx package, and provide them as a library,
         // including them with a statement like
@@ -75,7 +78,50 @@ tasks {
     }
 }
 
+tasks.jar {
+    exclude("**/schema/NOTICE.txt")
+    exclude("**/odx*.xsd*")
+    manifest {
+        addAttributes()
+    }
+}
+
 tasks.shadowJar {
     exclude("**/schema/NOTICE.txt")
     exclude("**/odx*.xsd*")
+    manifest {
+        addAttributes()
+    }
+}
+
+fun determineCommitHash(): String? {
+    // when built in a pipeline, always prefer the hash from the pipeline
+    val commitHash = System.getenv("GITHUB_SHA")
+    if (commitHash != null) {
+        return commitHash
+    }
+    // when built locally, try to use git as a fallback to determine the hash
+    try {
+        val data = providers.exec {
+            commandLine("git", "rev-parse", "HEAD")
+        }.standardOutput.asText.get().trim()
+        return data
+    } catch (_: Exception) {
+        return null
+    }
+}
+
+val commitHash = determineCommitHash() ?: "unknown"
+
+fun Manifest.addAttributes() {
+    val epochSeconds = System.getenv("SOURCE_DATE_EPOCH")?.toLong() ?: Instant.now().epochSecond
+    val timestamp = Instant.ofEpochSecond(epochSeconds).toString()
+
+    attributes(
+        "Implementation-Title" to project.name,
+        "Implementation-Version" to rootProject.version,
+        "Implementation-Commit" to commitHash,
+        "Implementation-BuildDate" to timestamp,
+        "Main-Class" to "ConverterKt",
+    )
 }
