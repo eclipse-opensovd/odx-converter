@@ -40,7 +40,10 @@ protobuf {
     // Configure the protoc executable
     protoc {
         // Download from repositories
-        artifact = libs.protobuf.protoc.get().toString()
+        artifact =
+            libs.protobuf.protoc
+                .get()
+                .toString()
     }
 }
 
@@ -48,7 +51,14 @@ tasks.withType<GenerateProtoTask>().configureEach {
 }
 
 tasks.register<Exec>("generateFbs") {
-    val cmd = listOf("flatc", "--kotlin", "-o", "${projectDir.absolutePath}/src/main/kotlin", "${projectDir.absolutePath}/src/main/fbs/diagnostic_description.fbs")
+    val cmd =
+        listOf(
+            "flatc",
+            "--kotlin",
+            "-o",
+            "${projectDir.absolutePath}/src/main/kotlin",
+            "${projectDir.absolutePath}/src/main/fbs/diagnostic_description.fbs",
+        )
     logger.info("Executing ${cmd.joinToString(" ")}")
     commandLine(cmd)
 }
