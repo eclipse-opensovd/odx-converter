@@ -1,0 +1,8 @@
+[*.{kt,kts}]
+ktlint_code_style = ktlint_official
+
+[**/dataformat/**]
+ktlint = disabled
+
+[**/schema/odx/**]
+ktlint = disabled

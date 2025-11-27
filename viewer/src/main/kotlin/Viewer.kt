@@ -40,7 +40,7 @@ class Viewer : CliktCommand() {
         canBeFile = true,
         canBeDir = false,
         mustBeWritable = false,
-        mustBeReadable = true
+        mustBeReadable = true,
     )
 
     override fun run() {
@@ -66,11 +66,12 @@ class Viewer : CliktCommand() {
             mddFile.chunksList.first { chunk -> chunk.type.equals(Chunk.DataType.DIAGNOSTIC_DESCRIPTION) }.data
 
         lateinit var data: ByteBuffer
-        val decompressTime = measureTime {
-            LZMACompressorInputStream(diagnosticDescription.newInput()).use { inputStream ->
-                data = ByteBuffer.wrap(inputStream.readAllBytes())
+        val decompressTime =
+            measureTime {
+                LZMACompressorInputStream(diagnosticDescription.newInput()).use { inputStream ->
+                    data = ByteBuffer.wrap(inputStream.readAllBytes())
+                }
             }
-        }
         println("Decompression took ${decompressTime.inWholeMilliseconds} ms")
 
         ecuData = EcuData.getRootAsEcuData(data)
@@ -90,83 +91,129 @@ class Viewer : CliktCommand() {
         }
 
         for (i in 0 until ecuData.dtcsLength) {
-            val dtc = ecuData.dtcs(i) ?: throw IllegalStateException("dtc must exist")
+            val dtc = ecuData.dtcs(i) ?: error("dtc must exist")
             o.indentedPrintln(0, dtc.displayTroubleCode)
             dtc.sdgs?.output(o, 2)
         }
 
         for (i in 0 until ecuData.functionalGroupsLength) {
-            val fg = ecuData.functionalGroups(i) ?: throw IllegalStateException("functional group must exist")
+            val fg = ecuData.functionalGroups(i) ?: error("functional group must exist")
             fg.output(o, 0)
         }
 
         println(bo.toString())
     }
 
-    private fun FunctionalGroup.output(p: PrintStream, indent: Int) {
+    private fun FunctionalGroup.output(
+        p: PrintStream,
+        indent: Int,
+    ) {
         p.indentedPrintln(indent, this.diagLayer?.shortName + ":")
         for (i in 0 until this.parentRefsLength) {
             val parentRef = this.parentRefs(i)
-            val parent = when(parentRef?.refType) {
-                ParentRefType.FunctionalGroup -> parentRef.ref(FunctionalGroup())
-                ParentRefType.EcuSharedData -> parentRef.ref(EcuSharedData())
-                ParentRefType.TableDop -> parentRef.ref(TableDop())
-                ParentRefType.Protocol -> parentRef.ref(Protocol())
-                ParentRefType.Variant -> parentRef.ref(Variant())
-                else -> error("Unknown parentRefType ${parentRef?.refType}")
-            } ?: error("Unknown parentRefType ${parentRef.refType}")
+            val parent =
+                when (parentRef?.refType) {
+                    ParentRefType.FunctionalGroup -> parentRef.ref(FunctionalGroup())
+                    ParentRefType.EcuSharedData -> parentRef.ref(EcuSharedData())
+                    ParentRefType.TableDop -> parentRef.ref(TableDop())
+                    ParentRefType.Protocol -> parentRef.ref(Protocol())
+                    ParentRefType.Variant -> parentRef.ref(Variant())
+                    else -> error("Unknown parentRefType ${parentRef?.refType}")
+                } ?: error("Unknown parentRefType ${parentRef.refType}")
 
             p.indentedPrintln(indent + 2, "ParentRef #$i: (${parent::class.simpleName})")
             if (parentRef.notInheritedDiagCommShortNamesLength > 0) {
-                p.indentedPrintln(indent + 4, "Not inherited diag comms: ${joinedStrings(parentRef.notInheritedDiagCommShortNamesLength, parentRef::notInheritedDiagCommShortNames)}")
+                p.indentedPrintln(
+                    indent + 4,
+                    "Not inherited diag comms: ${joinedStrings(
+                        parentRef.notInheritedDiagCommShortNamesLength,
+                        parentRef::notInheritedDiagCommShortNames,
+                    )}",
+                )
             }
             if (parentRef.notInheritedTablesShortNamesLength > 0) {
-                p.indentedPrintln(indent + 4, "Not inherited tables: ${joinedStrings(parentRef.notInheritedTablesShortNamesLength, parentRef::notInheritedTablesShortNames)}")
+                p.indentedPrintln(
+                    indent + 4,
+                    "Not inherited tables: ${joinedStrings(
+                        parentRef.notInheritedTablesShortNamesLength,
+                        parentRef::notInheritedTablesShortNames,
+                    )}",
+                )
             }
             if (parentRef.notInheritedDopsShortNamesLength > 0) {
-                p.indentedPrintln(indent + 4, "Not inherited dops: ${joinedStrings(parentRef.notInheritedDopsShortNamesLength, parentRef::notInheritedDopsShortNames)}")
+                p.indentedPrintln(
+                    indent + 4,
+                    "Not inherited dops: ${joinedStrings(
+                        parentRef.notInheritedDopsShortNamesLength,
+                        parentRef::notInheritedDopsShortNames,
+                    )}",
+                )
             }
             if (parentRef.notInheritedGlobalNegResponsesShortNamesLength > 0) {
-                p.indentedPrintln(indent + 4, "Not inherited global neg responses: ${joinedStrings(parentRef.notInheritedGlobalNegResponsesShortNamesLength, parentRef::notInheritedGlobalNegResponsesShortNames)}")
+                p.indentedPrintln(
+                    indent + 4,
+                    "Not inherited global neg responses: ${joinedStrings(
+                        parentRef.notInheritedGlobalNegResponsesShortNamesLength,
+                        parentRef::notInheritedGlobalNegResponsesShortNames,
+                    )}",
+                )
             }
             if (parentRef.notInheritedVariablesShortNamesLength > 0) {
-                p.indentedPrintln(indent + 4, "Not inherited variables: ${joinedStrings(parentRef.notInheritedVariablesShortNamesLength, parentRef::notInheritedVariablesShortNames)}")
+                p.indentedPrintln(
+                    indent + 4,
+                    "Not inherited variables: ${joinedStrings(
+                        parentRef.notInheritedVariablesShortNamesLength,
+                        parentRef::notInheritedVariablesShortNames,
+                    )}",
+                )
             }
         }
     }
 
-    private fun SDGS.output(p: PrintStream, indent: Int) {
+    private fun SDGS.output(
+        p: PrintStream,
+        indent: Int,
+    ) {
         for (i in 0 until this.sdgsLength) {
             val o = this.sdgs(i)
             o?.output(p, indent + 2)
         }
     }
 
-    private fun SD.output(p: PrintStream, indent: Int) {
+    private fun SD.output(
+        p: PrintStream,
+        indent: Int,
+    ) {
         p.indentedPrintln(indent, "${this.value} (si: ${this.si} ti: ${this.ti})")
     }
 
-    private fun SDG.output(p: PrintStream, indent: Int) {
+    private fun SDG.output(
+        p: PrintStream,
+        indent: Int,
+    ) {
         this.captionSn?.let {
             p.indentedPrintln(indent, "$it:")
         }
 
         for (i in 0 until this.sdsLength) {
-            val sdOrSdg = this.sds(i) ?: throw IllegalStateException("sdOrSdg must exist")
-            val obj = when (sdOrSdg.sdOrSdgType) {
-                SDxorSDG.SD -> sdOrSdg.sdOrSdg(SD())
-                SDxorSDG.SDG -> sdOrSdg.sdOrSdg(SDG())
-                else -> throw IllegalStateException("sdOrSdg must be valid")
-            }
+            val sdOrSdg = this.sds(i) ?: error("sdOrSdg must exist")
+            val obj =
+                when (sdOrSdg.sdOrSdgType) {
+                    SDxorSDG.SD -> sdOrSdg.sdOrSdg(SD())
+                    SDxorSDG.SDG -> sdOrSdg.sdOrSdg(SDG())
+                    else -> error("sdOrSdg must be valid")
+                }
             when (obj) {
                 is SD -> obj.output(p, indent + 2)
                 is SDG -> obj.output(p, indent + 2)
             }
         }
-
     }
 
-    private fun joinedStrings(length: Int, func: (Int) -> String?): String {
+    private fun joinedStrings(
+        length: Int,
+        func: (Int) -> String?,
+    ): String {
         val sb = StringBuffer()
         for (i in 0 until length) {
             if (i > 0) {
@@ -177,7 +224,10 @@ class Viewer : CliktCommand() {
         return sb.toString()
     }
 
-    fun PrintStream.indentedPrintln(indent: Int, value: String?) {
+    fun PrintStream.indentedPrintln(
+        indent: Int,
+        value: String?,
+    ) {
         this.println(" ".repeat(indent) + value)
     }
 }
