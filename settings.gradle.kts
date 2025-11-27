@@ -44,6 +44,9 @@ dependencyResolutionManagement {
 rootProject.name = "odx_converter"
 include("database")
 include("converter")
+include("converter-plugin-api")
+include("converter-plugins-default")
+
 if (File(rootProject.projectDir, "viewer").exists()) {
     include("viewer")
 }

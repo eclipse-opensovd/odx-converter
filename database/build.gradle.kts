@@ -16,6 +16,7 @@ import com.google.protobuf.gradle.GenerateProtoTask
 plugins {
     kotlin("jvm")
     id("com.google.protobuf") version libs.versions.protobuf
+    publishing
 }
 
 dependencies {

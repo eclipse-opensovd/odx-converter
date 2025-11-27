@@ -162,4 +162,3 @@ fun DIAGCODEDTYPE.toTypeEnum(): Byte =
         is STANDARDLENGTHTYPE -> DiagCodedTypeName.STANDARD_LENGTH_TYPE
         else -> throw IllegalStateException("Unknown diag coded type ${this::class.java.simpleName}")
     }
-

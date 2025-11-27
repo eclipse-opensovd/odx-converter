@@ -10,6 +10,8 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/converter" />
+            <option value="$PROJECT_DIR$/converter-plugin-api" />
+            <option value="$PROJECT_DIR$/converter-plugins-default" />
             <option value="$PROJECT_DIR$/database" />
             <option value="$PROJECT_DIR$/viewer" />
           </set>

@@ -32,6 +32,12 @@ class FileFormatter : Formatter() {
     private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS'Z'")
     override fun format(record: LogRecord): String {
         val dateTime = ZonedDateTime.now(UTC).format(formatter)
-        return "[${dateTime}] [${record.level.name.padEnd(7)}] ${formatMessage(record)}\n"
+        val sb = StringBuilder("[${dateTime}] [${record.level.name.padEnd(7)}] ${formatMessage(record)}")
+        record.thrown?.let {
+            sb.append(":\n")
+            sb.append(it.stackTraceToString())
+        }
+        sb.append("\n")
+        return sb.toString()
     }
 }

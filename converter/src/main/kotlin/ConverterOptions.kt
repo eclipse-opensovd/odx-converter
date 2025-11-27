@@ -25,3 +25,9 @@ data class PartialFilePattern(
     val jobFilePattern: String,
     val includePattern: String,
 )
+
+@Serializable
+data class PartialJobFilePattern(
+    val jobFileName: String,
+    val partialFilePattern: PartialFilePattern,
+)

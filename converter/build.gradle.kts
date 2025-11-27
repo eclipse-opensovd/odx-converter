@@ -11,7 +11,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import java.time.Clock
 import java.time.Instant
 
 plugins {
@@ -27,13 +26,14 @@ val odxSchema = file("$projectDir/src/main/resources/schema/odx_2_2_0.xsd")
 
 dependencies {
     implementation(project(":database"))
+    implementation(project(":converter-plugin-api"))
+    implementation(project(":converter-plugins-default"))
+
     implementation(libs.jakarta.xml.bind.api)
     implementation(libs.eclipse.persistence.moxy)
     implementation(libs.jaxb2.basics)
     implementation(libs.jaxb.api)
     implementation(libs.jaxb.impl)
-    implementation(libs.apache.compress)
-    implementation(libs.tukaani.xz)
     implementation(libs.clikt)
     implementation(libs.protobuf.java)
     implementation(libs.kotlinx.serialization.json)

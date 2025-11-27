@@ -11,12 +11,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import org.eclipse.opensovd.cda.mdd.Chunk
+import java.text.NumberFormat
 
-data class ChunkStat(
-    val chunkName: String,
-    val chunkType: Chunk.DataType,
-    val uncompressedSize: Long,
-    val compressedSize: Long?,
-    var rawSize: Long? = null,
-)
+fun Number.format(): String = NumberFormat.getNumberInstance().format(this)
