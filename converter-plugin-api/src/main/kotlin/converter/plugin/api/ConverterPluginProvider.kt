@@ -11,12 +11,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import org.eclipse.opensovd.cda.mdd.Chunk
+package converter.plugin.api
 
-data class ChunkStat(
-    val chunkName: String,
-    val chunkType: Chunk.DataType,
-    val uncompressedSize: Long,
-    val compressedSize: Long?,
-    var rawSize: Long? = null,
-)
+/**
+ * Provider interface to return a list of plugins, plugins need to provide the implementation
+ * in a META-INF/services/converter.plugin.api.ConverterPluginProvider file.
+ *
+ * The converter uses the ServiceLoader mechanism to get these Provider-Implementations, and
+ * retrieve the plugins.
+ */
+interface ConverterPluginProvider {
+    fun getPlugins(): List<ConverterPlugin>
+}

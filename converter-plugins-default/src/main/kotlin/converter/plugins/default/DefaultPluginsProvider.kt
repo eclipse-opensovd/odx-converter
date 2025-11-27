@@ -10,13 +10,16 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+package converter.plugins.default
 
-import org.eclipse.opensovd.cda.mdd.Chunk
+import converter.plugin.api.ConverterPlugin
+import converter.plugin.api.ConverterPluginProvider
 
-data class ChunkStat(
-    val chunkName: String,
-    val chunkType: Chunk.DataType,
-    val uncompressedSize: Long,
-    val compressedSize: Long?,
-    var rawSize: Long? = null,
-)
+/**
+ * Provides the default plugins
+ */
+class DefaultPluginsProvider : ConverterPluginProvider {
+    override fun getPlugins(): List<ConverterPlugin> = listOf(
+        CompressionPlugin(),
+    )
+}
