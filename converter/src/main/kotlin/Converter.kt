@@ -24,6 +24,7 @@ import converter.plugin.api.ConverterPlugin
 import converter.plugin.api.ConverterPluginProvider
 import jakarta.xml.bind.JAXBContext
 import jakarta.xml.bind.Unmarshaller
+import jakarta.xml.bind.ValidationEventHandler
 import kotlinx.serialization.json.Json
 import org.eclipse.opensovd.cda.mdd.Chunk
 import org.eclipse.opensovd.cda.mdd.MDDFile
@@ -196,6 +197,12 @@ class FileConverter(
                     inputFileData[entry.name] = input.readBytes()
                 }
             }
+        }
+
+        // Output ODX validation errors to log file
+        unmarshaller.eventHandler = ValidationEventHandler { event ->
+            logger.severe("ODX error: ${event.message}")
+            true  // keep going
         }
 
         inputFileData.forEach { entry ->
