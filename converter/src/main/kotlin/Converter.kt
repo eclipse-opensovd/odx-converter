@@ -23,15 +23,12 @@ import converter.plugin.api.ConverterApi
 import converter.plugin.api.ConverterPlugin
 import converter.plugin.api.ConverterPluginProvider
 import jakarta.xml.bind.JAXBContext
-import jakarta.xml.bind.UnmarshalException
 import jakarta.xml.bind.Unmarshaller
 import jakarta.xml.bind.ValidationEventHandler
 import kotlinx.serialization.json.Json
 import org.eclipse.opensovd.cda.mdd.Chunk
 import org.eclipse.opensovd.cda.mdd.MDDFile
-import org.eclipse.persistence.exceptions.XMLMarshalException.unmarshalException
 import schema.odx.ODX
-import severe
 import java.io.BufferedOutputStream
 import java.io.ByteArrayInputStream
 import java.io.File
