@@ -23,7 +23,7 @@ import converter.plugin.api.ConverterApi
 import converter.plugin.api.ConverterPlugin
 import converter.plugin.api.ConverterPluginProvider
 import jakarta.xml.bind.JAXBContext
-import jakarta.xml.bind.Unmarshaller
+import jakarta.xml.bind.ValidationEvent
 import jakarta.xml.bind.ValidationEventHandler
 import kotlinx.serialization.json.Json
 import org.eclipse.opensovd.cda.mdd.Chunk
@@ -47,7 +47,7 @@ import kotlin.time.measureTime
 
 class FileConverter(
     private val logger: Logger,
-    private val unmarshaller: Unmarshaller,
+    private val context: JAXBContext,
 ) {
     private fun retrievePlugins(): List<ConverterPlugin> {
         val provider = ServiceLoader.load(ConverterPluginProvider::class.java)
@@ -115,6 +115,7 @@ class FileConverter(
 
         val readParseFileDuration =
             measureTime {
+
                 readOdxFromZip(inputFile, odxData, inputFileData)
             }
         logger.fine("Reading and parsing into objects took $readParseFileDuration")
@@ -199,9 +200,19 @@ class FileConverter(
             }
         }
 
+        val unmarshaller = context.createUnmarshaller()
+
+        var hadParseErrors = false
         // Output ODX validation errors to log file
         unmarshaller.eventHandler = ValidationEventHandler { event ->
-            logger.severe("ODX error: ${event.message}")
+            val level = when (event.severity)  {
+                ValidationEvent.FATAL_ERROR -> Level.SEVERE
+                ValidationEvent.ERROR -> Level.SEVERE
+                ValidationEvent.WARNING -> Level.WARNING
+                else -> Level.INFO
+            }
+            logger.log(level, "ODX error: ${event.locator} ${event.message}")
+            hadParseErrors = true
             true  // keep going
         }
 
@@ -216,6 +227,10 @@ class FileConverter(
                         ODX::class.java,
                     ).value
             odxData[entry.key] = odx
+        }
+
+        if (hadParseErrors) {
+            error("Errors were encountered while parsing the ODX file, see log for details, aborting")
         }
     }
 }
@@ -260,8 +275,6 @@ class Converter : CliktCommand(name = "odx-converter") {
         org.eclipse.persistence.jaxb.JAXBContextFactory
             .createContext(arrayOf(ODX::class.java), null)
 
-    private val unmarshaller = context.createUnmarshaller()
-
     override fun run() {
         if (version) {
             println("Version: " + ManifestReader.version)
@@ -303,7 +316,7 @@ class Converter : CliktCommand(name = "odx-converter") {
                                                     )
                                                 },
                                         )
-                                    val converter = FileConverter(logger, unmarshaller)
+                                    val converter = FileConverter(logger, context)
                                     converter.convert(inputFile, outFile, options, stats)
                                 } catch (e: Exception) {
                                     hadErrors = true
