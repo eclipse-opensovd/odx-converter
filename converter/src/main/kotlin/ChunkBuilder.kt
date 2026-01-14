@@ -82,7 +82,7 @@ class ChunkBuilder {
                     it.jobFileName
                 }.flatMap {
                     val data =
-                        inputData[it.key] ?: throw IllegalStateException("File $jobFileName is not included in PDX")
+                        inputData[it.key] ?: error("File $jobFileName is not included in PDX")
                     if (it.key.endsWith(".jar", ignoreCase = true) || it.key.endsWith(".zip", ignoreCase = true)) {
                         ZipInputStream(ByteArrayInputStream(data)).use { zip ->
                             val matches =

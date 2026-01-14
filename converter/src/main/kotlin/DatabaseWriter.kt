@@ -210,7 +210,7 @@ import kotlin.collections.toUIntArray
 class DatabaseWriter(
     private val logger: Logger,
     private val odx: ODXCollection,
-    private val options: ConverterOptions
+    private val options: ConverterOptions,
 ) {
     private val builder = FlatBufferBuilder()
 
@@ -234,10 +234,11 @@ class DatabaseWriter(
         val odxRevision = odx.odxRevision.offset()
 
         val dtcs = EcuData.createDtcsVector(builder, dtcs.values.toIntArray())
-        val variants = EcuData.createVariantsVector(
-            builder,
-            baseVariantMap.values.toIntArray() + ecuVariantMap.values.toIntArray()
-        )
+        val variants =
+            EcuData.createVariantsVector(
+                builder,
+                baseVariantMap.values.toIntArray() + ecuVariantMap.values.toIntArray(),
+            )
         val functionalGroups = EcuData.createFunctionalGroupsVector(builder, functionalGroupMap.values.toIntArray())
 
         EcuData.startEcuData(builder)
@@ -260,32 +261,33 @@ class DatabaseWriter(
             val shortName = this.shortname.offset()
             val sdgs = this.sdgs?.offset()
 
-            val specificData = when (this) {
-                is DATAOBJECTPROP -> this.toNormalDop()
-                is ENDOFPDUFIELD -> this.toEndOfPduField()
-                is STATICFIELD -> this.toStaticField()
-                is ENVDATA -> this.toEnvData()
-                is ENVDATADESC -> this.toEnvDataDesc()
-                is schema.odx.DTCDOP -> this.toDTCDOP()
-                is STRUCTURE -> this.toStructure()
-                is schema.odx.MUX -> this.toMUXDOP()
-                is DYNAMICLENGTHFIELD -> this.toDynamicLengthField()
-                else -> throw IllegalStateException("Unknown type of data for DOP: $this")
-            }
+            val specificData =
+                when (this) {
+                    is DATAOBJECTPROP -> this.toNormalDop()
+                    is ENDOFPDUFIELD -> this.toEndOfPduField()
+                    is STATICFIELD -> this.toStaticField()
+                    is ENVDATA -> this.toEnvData()
+                    is ENVDATADESC -> this.toEnvDataDesc()
+                    is schema.odx.DTCDOP -> this.toDTCDOP()
+                    is STRUCTURE -> this.toStructure()
+                    is schema.odx.MUX -> this.toMUXDOP()
+                    is DYNAMICLENGTHFIELD -> this.toDynamicLengthField()
+                    else -> error("Unknown type of data for DOP: $this")
+                }
 
-            val specificDataType = when (this) {
-                is DATAOBJECTPROP -> SpecificDOPData.NormalDOP
-                is ENDOFPDUFIELD -> SpecificDOPData.EndOfPduField
-                is STATICFIELD -> SpecificDOPData.StaticField
-                is ENVDATA -> SpecificDOPData.EnvData
-                is ENVDATADESC -> SpecificDOPData.EnvDataDesc
-                is schema.odx.DTCDOP -> SpecificDOPData.DTCDOP
-                is STRUCTURE -> SpecificDOPData.Structure
-                is schema.odx.MUX -> SpecificDOPData.MUXDOP
-                is DYNAMICLENGTHFIELD -> SpecificDOPData.DynamicLengthField
-                else -> throw IllegalStateException("Unknown type of data for DOP: $this")
-            }
-
+            val specificDataType =
+                when (this) {
+                    is DATAOBJECTPROP -> SpecificDOPData.NormalDOP
+                    is ENDOFPDUFIELD -> SpecificDOPData.EndOfPduField
+                    is STATICFIELD -> SpecificDOPData.StaticField
+                    is ENVDATA -> SpecificDOPData.EnvData
+                    is ENVDATADESC -> SpecificDOPData.EnvDataDesc
+                    is schema.odx.DTCDOP -> SpecificDOPData.DTCDOP
+                    is STRUCTURE -> SpecificDOPData.Structure
+                    is schema.odx.MUX -> SpecificDOPData.MUXDOP
+                    is DYNAMICLENGTHFIELD -> SpecificDOPData.DynamicLengthField
+                    else -> error("Unknown type of data for DOP: $this")
+                }
 
             DOP.startDOP(builder)
             DOP.addShortName(builder, shortName)
@@ -300,25 +302,42 @@ class DatabaseWriter(
     private fun DIAGSERVICE.offset(): Int =
         cachedObjects.getOrPut(this) {
             val diagComm = (this as DIAGCOMM).offsetInternal()
-            val request = odx.requests[this.requestref.idref]?.offset()
-                ?: throw IllegalStateException("Couldn't find requestref ${this.requestref.idref}")
-            val posResponses = this.posresponserefs?.posresponseref?.map {
-                val pr = odx.posResponses[it.idref] ?: throw IllegalStateException("Couldn't find response ${it.idref}")
-                pr.offset()
-            }?.toIntArray()?.let {
-                DiagService.createPosResponsesVector(builder, it)
-            }
-            val negResponses = this.negresponserefs?.negresponseref?.map {
-                val nr = odx.negResponses[it.idref] ?: throw IllegalStateException("Couldn't find response ${it.idref}")
-                nr.offset()
-            }?.toIntArray()?.let {
-                DiagService.createNegResponsesVector(builder, it)
-            }
-            val comParamRefs = this.comparamrefs?.comparamref?.map {
-                it.offset()
-            }?.toIntArray()?.let {
-                DiagService.createComParamRefsVector(builder, it)
-            }
+            val request =
+                odx.requests[this.requestref.idref]?.offset()
+                    ?: error("Couldn't find requestref ${this.requestref.idref}")
+            val posResponses =
+                this.posresponserefs
+                    ?.posresponseref
+                    ?.map {
+                        val pr =
+                            odx.posResponses[it.idref]
+                                ?: error("Couldn't find response ${it.idref}")
+                        pr.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        DiagService.createPosResponsesVector(builder, it)
+                    }
+            val negResponses =
+                this.negresponserefs
+                    ?.negresponseref
+                    ?.map {
+                        val nr =
+                            odx.negResponses[it.idref]
+                                ?: error("Couldn't find response ${it.idref}")
+                        nr.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        DiagService.createNegResponsesVector(builder, it)
+                    }
+            val comParamRefs =
+                this.comparamrefs
+                    ?.comparamref
+                    ?.map {
+                        it.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        DiagService.createComParamRefsVector(builder, it)
+                    }
 
             DiagService.startDiagService(builder)
             DiagService.addDiagComm(builder, diagComm)
@@ -339,29 +358,37 @@ class DatabaseWriter(
             val semantic = this.semantic?.offset()
             val longName = this.longname?.offset()
             val keyLabel = this.keylabel?.offset()
-            val keyDop = this.keydopref?.idref?.let {
-                val dop =
-                    odx.combinedDataObjectProps[it] ?: throw IllegalStateException("Couldn't find dop ${it}")
-                dop.offset()
-            }
+            val keyDop =
+                this.keydopref?.idref?.let {
+                    val dop =
+                        odx.combinedDataObjectProps[it] ?: error("Couldn't find dop $it")
+                    dop.offset()
+                }
             val structLabel = this.structlabel?.offset()
             val sdgs = this.sdgs?.offset()
 
-            val rows = this.rowwrapper.map { row ->
-                if (row is TABLEROW) {
-                    row.offset()
-                } else {
-                    throw IllegalStateException("Unsupported row type ${row.javaClass.simpleName}")
-                }
-            }.toIntArray().let {
-                TableDop.createRowsVector(builder, it)
-            }
+            val rows =
+                this.rowwrapper
+                    .map { row ->
+                        if (row is TABLEROW) {
+                            row.offset()
+                        } else {
+                            error("Unsupported row type ${row.javaClass.simpleName}")
+                        }
+                    }.toIntArray()
+                    .let {
+                        TableDop.createRowsVector(builder, it)
+                    }
 
-            val diagCommConnectors = this.tablediagcommconnectors?.tablediagcommconnector?.map {
-                it.offset()
-            }?.toIntArray()?.let {
-                TableDop.createDiagCommConnectorVector(builder, it)
-            }
+            val diagCommConnectors =
+                this.tablediagcommconnectors
+                    ?.tablediagcommconnector
+                    ?.map {
+                        it.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        TableDop.createDiagCommConnectorVector(builder, it)
+                    }
 
             TableDop.startTableDop(builder)
             TableDop.addShortName(builder, shortName)
@@ -382,23 +409,24 @@ class DatabaseWriter(
         cachedObjects.getOrPut(this) {
             val semantic = this.semantic?.offset()
 
-            val diagComm = if (this.diagcommref != null) {
-                val diagService = this.diagcommref?.idref?.let { odx.diagServices[it] }
-                val ecuJob = this.diagcommref?.idref?.let { odx.singleEcuJobs[it] }
-                if (diagService == null && ecuJob == null) {
-                    throw IllegalStateException("Couldn't resolve ${this.diagcommref.idref}")
-                } else if (diagService != null) {
-                    diagService.offset() to DiagServiceOrJob.DiagService
-                } else if (ecuJob != null) {
-                    ecuJob.offset() to DiagServiceOrJob.SingleEcuJob
+            val diagComm =
+                if (this.diagcommref != null) {
+                    val diagService = this.diagcommref?.idref?.let { odx.diagServices[it] }
+                    val ecuJob = this.diagcommref?.idref?.let { odx.singleEcuJobs[it] }
+                    if (diagService == null && ecuJob == null) {
+                        error("Couldn't resolve ${this.diagcommref.idref}")
+                    } else if (diagService != null) {
+                        diagService.offset() to DiagServiceOrJob.DiagService
+                    } else if (ecuJob != null) {
+                        ecuJob.offset() to DiagServiceOrJob.SingleEcuJob
+                    } else {
+                        error("Invalid state, no diagService or SingleEcuJOb")
+                    }
+                } else if (this.diagcommsnref != null) {
+                    error("Unsupported short name ref ${this.diagcommsnref}")
                 } else {
-                    throw IllegalStateException("Invalid state, no diagService or SingleEcuJOb")
+                    error("Empty Diag Comm Connector $this")
                 }
-            } else if (this.diagcommsnref != null) {
-                throw IllegalStateException("Unsupported short name ref ${this.diagcommsnref}")
-            } else {
-                throw IllegalStateException("Empty Diag Comm Connector $this")
-            }
 
             TableDiagCommConnector.startTableDiagCommConnector(builder)
             semantic?.let { TableDiagCommConnector.addSemantic(builder, it) }
@@ -426,30 +454,39 @@ class DatabaseWriter(
         cachedObjects.getOrPut(this) {
             val si = this.si?.offset()
 
-            val caption = this.sdgcaption?.shortname?.offset() ?: this.sdgcaptionref?.idref?.let {
-                val sdgCaption = odx.sdgCaptions[it] ?: throw IllegalStateException("Couldn't find sdg-caption $it")
-                sdgCaption.shortname
-            }?.offset()
+            val caption =
+                this.sdgcaption?.shortname?.offset() ?: this.sdgcaptionref
+                    ?.idref
+                    ?.let {
+                        val sdgCaption =
+                            odx.sdgCaptions[it] ?: error("Couldn't find sdg-caption $it")
+                        sdgCaption.shortname
+                    }?.offset()
 
-            val sdg = this.sdgOrSD?.map {
-                val sdOrSdg = when (it) {
-                    is schema.odx.SD -> it.offset()
-                    is schema.odx.SDG -> it.offset()
-                    else -> throw IllegalArgumentException("Unknown sdg type: $it")
-                }
-                val sdOrSdgType = when (it) {
-                    is schema.odx.SD -> SDxorSDG.SD
-                    is schema.odx.SDG -> SDxorSDG.SDG
-                    else -> error("This path should never be reached -- unknown object type in SDOrSDG list $it")
-                }
+            val sdg =
+                this.sdgOrSD
+                    ?.map {
+                        val sdOrSdg =
+                            when (it) {
+                                is schema.odx.SD -> it.offset()
+                                is schema.odx.SDG -> it.offset()
+                                else -> error("Unknown sdg type: $it")
+                            }
+                        val sdOrSdgType =
+                            when (it) {
+                                is schema.odx.SD -> SDxorSDG.SD
+                                is schema.odx.SDG -> SDxorSDG.SDG
+                                else -> error("This path should never be reached -- unknown object type in SDOrSDG list $it")
+                            }
 
-                SDOrSDG.startSDOrSDG(builder)
-                SDOrSDG.addSdOrSdg(builder, sdOrSdg)
-                SDOrSDG.addSdOrSdgType(builder, sdOrSdgType)
-                SDOrSDG.endSDOrSDG(builder)
-            }?.toIntArray()?.let {
-                SDG.createSdsVector(builder, it)
-            }
+                        SDOrSDG.startSDOrSDG(builder)
+                        SDOrSDG.addSdOrSdg(builder, sdOrSdg)
+                        SDOrSDG.addSdOrSdgType(builder, sdOrSdgType)
+                        SDOrSDG.endSDOrSDG(builder)
+                    }?.toIntArray()
+                    ?.let {
+                        SDG.createSdsVector(builder, it)
+                    }
 
             SDG.startSDG(builder)
             si?.let { SDG.addSi(builder, it) }
@@ -470,11 +507,15 @@ class DatabaseWriter(
     private fun REQUEST.offset(): Int =
         cachedObjects.getOrPut(this) {
             val sdgs = this.sdgs?.offset()
-            val params = this.params?.param?.map {
-                it.offset()
-            }?.toIntArray()?.let {
-                Request.createParamsVector(builder, it)
-            }
+            val params =
+                this.params
+                    ?.param
+                    ?.map {
+                        it.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        Request.createParamsVector(builder, it)
+                    }
 
             Request.startRequest(builder)
             sdgs?.let { Request.addSdgs(builder, it) }
@@ -485,18 +526,22 @@ class DatabaseWriter(
     private fun RESPONSE.offset(): Int =
         cachedObjects.getOrPut(this) {
             val sdgs = this.sdgs?.offset()
-            val params = this.params?.param?.map {
-                it.offset()
-            }?.toIntArray()?.let {
-                Request.createParamsVector(builder, it)
-            }
+            val params =
+                this.params
+                    ?.param
+                    ?.map {
+                        it.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        Request.createParamsVector(builder, it)
+                    }
 
             Response.startResponse(builder)
             when (this) {
                 is POSRESPONSE -> Response.addResponseType(builder, ResponseType.POS_RESPONSE)
                 is NEGRESPONSE -> Response.addResponseType(builder, ResponseType.NEG_RESPONSE)
                 is GLOBALNEGRESPONSE -> Response.addResponseType(builder, ResponseType.GLOBAL_NEG_RESPONSE)
-                else -> throw IllegalStateException("Unknown response type ${this::class.java.simpleName}")
+                else -> error("Unknown response type ${this::class.java.simpleName}")
             }
             sdgs?.let {
                 Response.addSdgs(builder, it)
@@ -514,191 +559,207 @@ class DatabaseWriter(
                 val semantic = this.semantic?.offset()
                 val sdgs = this.sdgs?.offset()
 
-                val specificData = when (this) {
-                    is VALUE -> {
-                        this.dopsnref?.shortname?.let {
-                            TODO("dop shortname ref in VALUE not supported ${this.dopsnref.shortname}")
-                        }
-                        val dop = this.dopref?.let {
-                            val dop = odx.combinedDataObjectProps[it.idref]
-                                ?: throw IllegalStateException("Couldn't find ${it.idref}")
-                            dop.offset()
-                        }
-                        val physicalDefaultValue = this.physicaldefaultvalue?.offset()
-
-                        Value.startValue(builder)
-                        dop?.let { Value.addDop(builder, it) }
-                        physicalDefaultValue?.let { Value.addPhysicalDefaultValue(builder, it) }
-                        Value.endValue(builder)
-
-                    }
-
-                    is CODEDCONST -> {
-                        val diagCodedType = this.diagcodedtype.offset()
-                        val codedValue = this.codedvalue?.offset()
-
-                        CodedConst.startCodedConst(builder)
-                        CodedConst.addDiagCodedType(builder, diagCodedType)
-                        codedValue?.let { CodedConst.addCodedValue(builder, it) }
-                        CodedConst.endCodedConst(builder)
-                    }
-
-                    is DYNAMIC -> {
-                        Dynamic.startDynamic(builder)
-                        Dynamic.endDynamic(builder)
-                    }
-
-                    is LENGTHKEY -> {
-                        if (this.dopsnref?.shortname != null) {
-                            TODO("DOP short name not supported ${this.dopsnref.shortname}")
-                        }
-                        val dop = this.dopref?.let {
-                            val dop = odx.combinedDataObjectProps[it.idref]
-                                ?: throw IllegalStateException("Couldn't find ${it.idref}")
-                            dop.offset()
-                        }
-
-                        LengthKeyRef.startLengthKeyRef(builder)
-                        dop?.let { LengthKeyRef.addDop(builder, it) }
-                        LengthKeyRef.endLengthKeyRef(builder)
-                    }
-
-                    is MATCHINGREQUESTPARAM -> {
-                        MatchingRequestParam.startMatchingRequestParam(builder)
-                        MatchingRequestParam.addRequestBytePos(builder, this.requestbytepos)
-                        MatchingRequestParam.addByteLength(builder, this.bytelength.toUInt())
-                        MatchingRequestParam.endMatchingRequestParam(builder)
-                    }
-
-                    is NRCCONST -> {
-                        val diagCodedType = this.diagcodedtype?.offset()
-                        val codedValues = this.codedvalues?.codedvalue?.map { it.offset() }?.toIntArray()?.let {
-                            NrcConst.createCodedValuesVector(builder, it)
-                        }
-
-                        NrcConst.startNrcConst(builder)
-                        diagCodedType?.let { NrcConst.addDiagCodedType(builder, it) }
-                        codedValues?.let { NrcConst.addCodedValues(builder, it) }
-                        NrcConst.endNrcConst(builder)
-                    }
-
-                    is PHYSCONST -> {
-                        val physConstValue = this.physconstantvalue?.offset()
-                        val dop = this.dopref?.let {
-                            val dop = odx.combinedDataObjectProps[it.idref]
-                                ?: throw IllegalStateException("couldn't find dop ${it.idref}")
-                            dop.offset()
-                        }
-                        this.dopsnref?.shortname?.let {
-                            TODO("DOP short name not supported ${this.dopsnref.shortname}")
-                        }
-
-                        PhysConst.startPhysConst(builder)
-                        physConstValue?.let { PhysConst.addPhysConstantValue(builder, it) }
-                        dop?.let { PhysConst.addDop(builder, it) }
-                        PhysConst.endPhysConst(builder)
-                    }
-
-                    is RESERVED -> {
-                        Reserved.startReserved(builder)
-                        Reserved.addBitLength(builder, this.bitlength.toUInt())
-                        Reserved.endReserved(builder)
-                    }
-
-                    is SYSTEM -> {
-                        this.dopsnref?.shortname?.let {
-                            TODO("DOP short name ref ${this.dopsnref.shortname}")
-                        }
-
-                        val sysParam = this.sysparam.offset()
-                        val dop = this.dopref?.let {
-                            val dop = odx.combinedDataObjectProps[it.idref]
-                                ?: throw IllegalStateException("Couldn't find DOP ${it.idref}")
-                            dop.offset()
-                        }
-
-                        dataformat.System.startSystem(builder)
-
-                        dataformat.System.addSysParam(builder, sysParam)
-                        dop?.let { dataformat.System.addDop(builder, it) }
-
-                        dataformat.System.endSystem(builder)
-                    }
-
-                    is TABLEKEY -> {
-                        val entry =
-                            this.rest.firstOrNull()?.value
-                                ?: throw IllegalStateException("TABLE-KEY ${this.id} has no entries")
-                        if (this.rest.size > 1) {
-                            throw IllegalStateException("TABLE-KEY ${this.id} has more than one entry")
-                        }
-                        var tableKeyReference: Int
-                        var tableKeyReferenceType: UByte
-                        if (entry is ODXLINK) {
-                            val table = odx.tables[entry.idref]
-                            if (table == null) {
-                                val row = odx.tableRows[entry.idref]
-                                    ?: throw IllegalStateException("ODXLINK ${this.id} is neither TABLE nor TABLE-KEY")
-                                tableKeyReference = row.offset()
-                                tableKeyReferenceType = TableKeyReference.TableRow
-                            } else {
-                                tableKeyReference = table.offset();
-                                tableKeyReferenceType = TableKeyReference.TableDop
+                val specificData =
+                    when (this) {
+                        is VALUE -> {
+                            this.dopsnref?.shortname?.let {
+                                TODO("dop shortname ref in VALUE not supported ${this.dopsnref.shortname}")
                             }
-                        } else {
-                            throw IllegalStateException("Unknown type for TABLE-KEY/TABLEROW ${this.id} entry ${entry.javaClass.simpleName}")
+                            val dop =
+                                this.dopref?.let {
+                                    val dop =
+                                        odx.combinedDataObjectProps[it.idref]
+                                            ?: error("Couldn't find ${it.idref}")
+                                    dop.offset()
+                                }
+                            val physicalDefaultValue = this.physicaldefaultvalue?.offset()
+
+                            Value.startValue(builder)
+                            dop?.let { Value.addDop(builder, it) }
+                            physicalDefaultValue?.let { Value.addPhysicalDefaultValue(builder, it) }
+                            Value.endValue(builder)
                         }
 
-                        TableKey.startTableKey(builder)
-                        TableKey.addTableKeyReference(builder, tableKeyReference)
-                        TableKey.addTableKeyReferenceType(builder, tableKeyReferenceType)
-                        TableKey.endTableKey(builder)
-                    }
+                        is CODEDCONST -> {
+                            val diagCodedType = this.diagcodedtype.offset()
+                            val codedValue = this.codedvalue?.offset()
 
-                    is TABLEENTRY -> {
-                        val param = (this as PARAM).offset()
-                        val target = this.target?.toFileFormatEnum()
-                        val tableRow = this.tablerowref.idref?.let {
-                            val row = odx.tableRows[it] ?: throw IllegalStateException("Couldn't find TABLE-ROW $it")
-                            row.offset()
+                            CodedConst.startCodedConst(builder)
+                            CodedConst.addDiagCodedType(builder, diagCodedType)
+                            codedValue?.let { CodedConst.addCodedValue(builder, it) }
+                            CodedConst.endCodedConst(builder)
                         }
 
-                        TableEntry.startTableEntry(builder)
-                        TableEntry.addParam(builder, param)
-                        target?.let { TableEntry.addTarget(builder, it) }
-                        tableRow?.let { TableEntry.addTableRow(builder, it) }
-                        TableEntry.endTableEntry(builder)
-                    }
-
-                    is TABLESTRUCT -> {
-                        this.tablekeysnref?.let {
-                            TODO("TABLE-KEY-SNREF not supported ${this.shortname}")
+                        is DYNAMIC -> {
+                            Dynamic.startDynamic(builder)
+                            Dynamic.endDynamic(builder)
                         }
-                        val tableKey = odx.tableKeys[this.tablekeyref.idref]?.offset()
-                            ?: throw IllegalStateException("Couldn't find TABLE-KEY ${this.tablekeyref.idref}")
 
-                        TableStruct.startTableStruct(builder)
-                        tableKey.let { TableStruct.addTableKey(builder, it) }
-                        TableStruct.endTableStruct(builder)
+                        is LENGTHKEY -> {
+                            if (this.dopsnref?.shortname != null) {
+                                TODO("DOP short name not supported ${this.dopsnref.shortname}")
+                            }
+                            val dop =
+                                this.dopref?.let {
+                                    val dop =
+                                        odx.combinedDataObjectProps[it.idref]
+                                            ?: error("Couldn't find ${it.idref}")
+                                    dop.offset()
+                                }
+
+                            LengthKeyRef.startLengthKeyRef(builder)
+                            dop?.let { LengthKeyRef.addDop(builder, it) }
+                            LengthKeyRef.endLengthKeyRef(builder)
+                        }
+
+                        is MATCHINGREQUESTPARAM -> {
+                            MatchingRequestParam.startMatchingRequestParam(builder)
+                            MatchingRequestParam.addRequestBytePos(builder, this.requestbytepos)
+                            MatchingRequestParam.addByteLength(builder, this.bytelength.toUInt())
+                            MatchingRequestParam.endMatchingRequestParam(builder)
+                        }
+
+                        is NRCCONST -> {
+                            val diagCodedType = this.diagcodedtype?.offset()
+                            val codedValues =
+                                this.codedvalues?.codedvalue?.map { it.offset() }?.toIntArray()?.let {
+                                    NrcConst.createCodedValuesVector(builder, it)
+                                }
+
+                            NrcConst.startNrcConst(builder)
+                            diagCodedType?.let { NrcConst.addDiagCodedType(builder, it) }
+                            codedValues?.let { NrcConst.addCodedValues(builder, it) }
+                            NrcConst.endNrcConst(builder)
+                        }
+
+                        is PHYSCONST -> {
+                            val physConstValue = this.physconstantvalue?.offset()
+                            val dop =
+                                this.dopref?.let {
+                                    val dop =
+                                        odx.combinedDataObjectProps[it.idref]
+                                            ?: error("couldn't find dop ${it.idref}")
+                                    dop.offset()
+                                }
+                            this.dopsnref?.shortname?.let {
+                                TODO("DOP short name not supported ${this.dopsnref.shortname}")
+                            }
+
+                            PhysConst.startPhysConst(builder)
+                            physConstValue?.let { PhysConst.addPhysConstantValue(builder, it) }
+                            dop?.let { PhysConst.addDop(builder, it) }
+                            PhysConst.endPhysConst(builder)
+                        }
+
+                        is RESERVED -> {
+                            Reserved.startReserved(builder)
+                            Reserved.addBitLength(builder, this.bitlength.toUInt())
+                            Reserved.endReserved(builder)
+                        }
+
+                        is SYSTEM -> {
+                            this.dopsnref?.shortname?.let {
+                                TODO("DOP short name ref ${this.dopsnref.shortname}")
+                            }
+
+                            val sysParam = this.sysparam.offset()
+                            val dop =
+                                this.dopref?.let {
+                                    val dop =
+                                        odx.combinedDataObjectProps[it.idref]
+                                            ?: error("Couldn't find DOP ${it.idref}")
+                                    dop.offset()
+                                }
+
+                            dataformat.System.startSystem(builder)
+
+                            dataformat.System.addSysParam(builder, sysParam)
+                            dop?.let { dataformat.System.addDop(builder, it) }
+
+                            dataformat.System.endSystem(builder)
+                        }
+
+                        is TABLEKEY -> {
+                            val entry =
+                                this.rest.firstOrNull()?.value
+                                    ?: error("TABLE-KEY ${this.id} has no entries")
+                            if (this.rest.size > 1) {
+                                error("TABLE-KEY ${this.id} has more than one entry")
+                            }
+                            var tableKeyReference: Int
+                            var tableKeyReferenceType: UByte
+                            if (entry is ODXLINK) {
+                                val table = odx.tables[entry.idref]
+                                if (table == null) {
+                                    val row =
+                                        odx.tableRows[entry.idref]
+                                            ?: error("ODXLINK ${this.id} is neither TABLE nor TABLE-KEY")
+                                    tableKeyReference = row.offset()
+                                    tableKeyReferenceType = TableKeyReference.TableRow
+                                } else {
+                                    tableKeyReference = table.offset()
+                                    tableKeyReferenceType = TableKeyReference.TableDop
+                                }
+                            } else {
+                                error("Unknown type for TABLE-KEY/TABLEROW ${this.id} entry ${entry.javaClass.simpleName}")
+                            }
+
+                            TableKey.startTableKey(builder)
+                            TableKey.addTableKeyReference(builder, tableKeyReference)
+                            TableKey.addTableKeyReferenceType(builder, tableKeyReferenceType)
+                            TableKey.endTableKey(builder)
+                        }
+
+                        is TABLEENTRY -> {
+                            val param = (this as PARAM).offset()
+                            val target = this.target?.toFileFormatEnum()
+                            val tableRow =
+                                this.tablerowref.idref?.let {
+                                    val row =
+                                        odx.tableRows[it] ?: error("Couldn't find TABLE-ROW $it")
+                                    row.offset()
+                                }
+
+                            TableEntry.startTableEntry(builder)
+                            TableEntry.addParam(builder, param)
+                            target?.let { TableEntry.addTarget(builder, it) }
+                            tableRow?.let { TableEntry.addTableRow(builder, it) }
+                            TableEntry.endTableEntry(builder)
+                        }
+
+                        is TABLESTRUCT -> {
+                            this.tablekeysnref?.let {
+                                TODO("TABLE-KEY-SNREF not supported ${this.shortname}")
+                            }
+                            val tableKey =
+                                odx.tableKeys[this.tablekeyref.idref]?.offset()
+                                    ?: error("Couldn't find TABLE-KEY ${this.tablekeyref.idref}")
+
+                            TableStruct.startTableStruct(builder)
+                            tableKey.let { TableStruct.addTableKey(builder, it) }
+                            TableStruct.endTableStruct(builder)
+                        }
+
+                        else -> {
+                            error("Unknown object type ${this.javaClass.simpleName}")
+                        }
                     }
-
-                    else -> throw IllegalStateException("Unknown object type ${this.javaClass.simpleName}")
-                }
-                val specificDataType = when (this) {
-                    is VALUE -> ParamSpecificData.Value
-                    is CODEDCONST -> ParamSpecificData.CodedConst
-                    is DYNAMIC -> ParamSpecificData.Dynamic
-                    is LENGTHKEY -> ParamSpecificData.LengthKeyRef
-                    is MATCHINGREQUESTPARAM -> ParamSpecificData.MatchingRequestParam
-                    is NRCCONST -> ParamSpecificData.NrcConst
-                    is PHYSCONST -> ParamSpecificData.PhysConst
-                    is RESERVED -> ParamSpecificData.Reserved
-                    is SYSTEM -> ParamSpecificData.System
-                    is TABLEKEY -> ParamSpecificData.TableKey
-                    is TABLEENTRY -> ParamSpecificData.TableEntry
-                    is TABLESTRUCT -> ParamSpecificData.TableStruct
-                    else -> throw IllegalStateException("Unknown object type ${this.javaClass.simpleName}")
-                }
+                val specificDataType =
+                    when (this) {
+                        is VALUE -> ParamSpecificData.Value
+                        is CODEDCONST -> ParamSpecificData.CodedConst
+                        is DYNAMIC -> ParamSpecificData.Dynamic
+                        is LENGTHKEY -> ParamSpecificData.LengthKeyRef
+                        is MATCHINGREQUESTPARAM -> ParamSpecificData.MatchingRequestParam
+                        is NRCCONST -> ParamSpecificData.NrcConst
+                        is PHYSCONST -> ParamSpecificData.PhysConst
+                        is RESERVED -> ParamSpecificData.Reserved
+                        is SYSTEM -> ParamSpecificData.System
+                        is TABLEKEY -> ParamSpecificData.TableKey
+                        is TABLEENTRY -> ParamSpecificData.TableEntry
+                        is TABLESTRUCT -> ParamSpecificData.TableStruct
+                        else -> error("Unknown object type ${this.javaClass.simpleName}")
+                    }
 
                 Param.startParam(builder)
                 Param.addParamType(builder, this.toParamTypeEnum())
@@ -762,8 +823,9 @@ class DatabaseWriter(
     }
 
     private fun PARAMLENGTHINFOTYPE.toParamLengthInfoType(): Int {
-        val lengthKey = odx.lengthKeys[this.lengthkeyref.idref]?.offset()
-            ?: throw IllegalStateException("Unknown length key reference ${this.lengthkeyref.idref}")
+        val lengthKey =
+            odx.lengthKeys[this.lengthkeyref.idref]?.offset()
+                ?: error("Unknown length key reference ${this.lengthkeyref.idref}")
 
         ParamLengthInfoType.startParamLengthInfoType(builder)
         ParamLengthInfoType.addLengthKey(builder, lengthKey)
@@ -772,10 +834,11 @@ class DatabaseWriter(
 
     private fun DATAOBJECTPROP.toNormalDop(): Int {
         val diagCodedType = this.diagcodedtype?.offset()
-        val unit = this.unitref?.let {
-            val unit = odx.units[it.idref] ?: throw IllegalStateException("Couldn't find unit ${it.idref}")
-            unit.offset()
-        }
+        val unit =
+            this.unitref?.let {
+                val unit = odx.units[it.idref] ?: error("Couldn't find unit ${it.idref}")
+                unit.offset()
+            }
         val physicalType = this.physicaltype?.offset()
         val compuMethod = this.compumethod?.offset()
 
@@ -792,24 +855,50 @@ class DatabaseWriter(
         cachedObjects.getOrPut(this) {
             val baseTypeEncoding = this.basetypeencoding?.offset()
 
-            val specificData = when (this) {
-                is STANDARDLENGTHTYPE -> this.toStandardLengthType()
-                is MINMAXLENGTHTYPE -> this.toMinMaxLengthType()
-                is LEADINGLENGTHINFOTYPE -> this.toLeadingLengthInfoType()
-                is PARAMLENGTHINFOTYPE -> this.toParamLengthInfoType()
-                else -> {
-                    throw IllegalStateException("Unsupported diag coded type ${this::class.java.simpleName}")
+            val specificData =
+                when (this) {
+                    is STANDARDLENGTHTYPE -> {
+                        this.toStandardLengthType()
+                    }
+
+                    is MINMAXLENGTHTYPE -> {
+                        this.toMinMaxLengthType()
+                    }
+
+                    is LEADINGLENGTHINFOTYPE -> {
+                        this.toLeadingLengthInfoType()
+                    }
+
+                    is PARAMLENGTHINFOTYPE -> {
+                        this.toParamLengthInfoType()
+                    }
+
+                    else -> {
+                        error("Unsupported diag coded type ${this::class.java.simpleName}")
+                    }
                 }
-            }
-            val specificType = when (this) {
-                is STANDARDLENGTHTYPE -> SpecificDataType.StandardLengthType
-                is MINMAXLENGTHTYPE -> SpecificDataType.MinMaxLengthType
-                is LEADINGLENGTHINFOTYPE -> SpecificDataType.LeadingLengthInfoType
-                is PARAMLENGTHINFOTYPE -> SpecificDataType.ParamLengthInfoType
-                else -> {
-                    throw IllegalStateException("Unsupported diag coded type ${this::class.java.simpleName}")
+            val specificType =
+                when (this) {
+                    is STANDARDLENGTHTYPE -> {
+                        SpecificDataType.StandardLengthType
+                    }
+
+                    is MINMAXLENGTHTYPE -> {
+                        SpecificDataType.MinMaxLengthType
+                    }
+
+                    is LEADINGLENGTHINFOTYPE -> {
+                        SpecificDataType.LeadingLengthInfoType
+                    }
+
+                    is PARAMLENGTHINFOTYPE -> {
+                        SpecificDataType.ParamLengthInfoType
+                    }
+
+                    else -> {
+                        error("Unsupported diag coded type ${this::class.java.simpleName}")
+                    }
                 }
-            }
             DiagCodedType.startDiagCodedType(builder)
 
             DiagCodedType.addType(builder, this.toTypeEnum())
@@ -828,11 +917,13 @@ class DatabaseWriter(
         cachedObjects.getOrPut(this) {
             val shortName = this.shortname.offset()
             val displayName = this.displayname.offset()
-            val physicaldimension = this.physicaldimensionref?.let { ref ->
-                val physDimension = odx.physDimensions[ref.idref]
-                    ?: throw IllegalStateException("Couldn't find physical dimension ${ref.idref}")
-                physDimension.offset()
-            }
+            val physicaldimension =
+                this.physicaldimensionref?.let { ref ->
+                    val physDimension =
+                        odx.physDimensions[ref.idref]
+                            ?: error("Couldn't find physical dimension ${ref.idref}")
+                    physDimension.offset()
+                }
 
             dataformat.Unit.startUnit(builder)
 
@@ -852,7 +943,6 @@ class DatabaseWriter(
         }
 
     private fun ENDOFPDUFIELD.toEndOfPduField(): Int {
-
         val field = this.toField()
 
         EndOfPduField.startEndOfPduField(builder)
@@ -877,21 +967,25 @@ class DatabaseWriter(
     }
 
     private fun FIELD.toField(): Int {
-        val basicStructure = this.basicstructureref?.let {
-            val dop =
-                odx.combinedDataObjectProps[it.idref] ?: throw IllegalStateException("Couldn't find dop ${it.idref}")
-            dop.offset()
-        }
+        val basicStructure =
+            this.basicstructureref?.let {
+                val dop =
+                    odx.combinedDataObjectProps[it.idref]
+                        ?: error("Couldn't find dop ${it.idref}")
+                dop.offset()
+            }
         this.basicstructuresnref?.let {
-            throw IllegalStateException("Short name reference for basic structure ref not supported")
+            error("Short name reference for basic structure ref not supported")
         }
-        val envDataRef = this.envdatadescref?.let {
-            val dop =
-                odx.combinedDataObjectProps[it.idref] ?: throw IllegalStateException("Couldn't find dop ${it.idref}")
-            dop.offset()
-        }
+        val envDataRef =
+            this.envdatadescref?.let {
+                val dop =
+                    odx.combinedDataObjectProps[it.idref]
+                        ?: error("Couldn't find dop ${it.idref}")
+                dop.offset()
+            }
         this.envdatadescsnref?.let {
-            throw IllegalStateException("Short name reference for envdata desc not supported")
+            error("Short name reference for envdata desc not supported")
         }
 
         Field.startField(builder)
@@ -904,12 +998,14 @@ class DatabaseWriter(
     }
 
     private fun ENVDATA.toEnvData(): Int {
-        val dtcValues = this.dtcvalues?.dtcvalue?.map { it.value.toUInt() }?.toUIntArray()?.let {
-            EnvData.createDtcValuesVector(builder, it)
-        }
-        val params = this.params?.param?.map { it.offset() }?.toIntArray()?.let {
-            EnvData.createParamsVector(builder, it)
-        }
+        val dtcValues =
+            this.dtcvalues?.dtcvalue?.map { it.value.toUInt() }?.toUIntArray()?.let {
+                EnvData.createDtcValuesVector(builder, it)
+            }
+        val params =
+            this.params?.param?.map { it.offset() }?.toIntArray()?.let {
+                EnvData.createParamsVector(builder, it)
+            }
 
         EnvData.startEnvData(builder)
         dtcValues?.let { EnvData.addDtcValues(builder, dtcValues) }
@@ -918,13 +1014,17 @@ class DatabaseWriter(
     }
 
     private fun ENVDATADESC.toEnvDataDesc(): Int {
-        val envDatas = this.envdatarefs?.envdataref?.map {
-            val envData =
-                odx.envDatas[it.idref] ?: throw IllegalStateException("Couldn't find env data ${it.idref}")
-            envData.offset()
-        }?.toIntArray()?.let {
-            EnvDataDesc.createEnvDatasVector(builder, it)
-        }
+        val envDatas =
+            this.envdatarefs
+                ?.envdataref
+                ?.map {
+                    val envData =
+                        odx.envDatas[it.idref] ?: error("Couldn't find env data ${it.idref}")
+                    envData.offset()
+                }?.toIntArray()
+                ?.let {
+                    EnvDataDesc.createEnvDatasVector(builder, it)
+                }
 
         val paramShortName = this.paramsnref?.shortname?.offset()
         val paramShortNamePath = this.paramsnpathref?.shortnamepath?.offset()
@@ -1048,13 +1148,18 @@ class DatabaseWriter(
             val syntax = this.syntax?.offset()
             val revision = this.revision?.offset()
             val entrypoint = this.entrypoint?.offset()
-            val libraries = this.libraryrefs?.libraryref?.map { ref ->
-                val library =
-                    odx.libraries[ref.idref] ?: throw IllegalStateException("Couldn't find LIBRARY ${ref.idref}")
-                library.offset()
-            }?.toIntArray()?.let {
-                ProgCode.createLibraryVector(builder, it)
-            }
+            val libraries =
+                this.libraryrefs
+                    ?.libraryref
+                    ?.map { ref ->
+                        val library =
+                            odx.libraries[ref.idref]
+                                ?: error("Couldn't find LIBRARY ${ref.idref}")
+                        library.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        ProgCode.createLibraryVector(builder, it)
+                    }
 
             ProgCode.startProgCode(builder)
             codeFile?.let { ProgCode.addCodeFile(builder, it) }
@@ -1070,9 +1175,10 @@ class DatabaseWriter(
     private fun COMPUPHYSTOINTERNAL.offset(): Int =
         cachedObjects.getOrPut(this) {
             val progcode = this.progcode?.offset()
-            val compuscales = this.compuscales?.compuscale?.map { it.offset() }?.toIntArray()?.let {
-                CompuPhysToInternal.createCompuScalesVector(builder, it)
-            }
+            val compuscales =
+                this.compuscales?.compuscale?.map { it.offset() }?.toIntArray()?.let {
+                    CompuPhysToInternal.createCompuScalesVector(builder, it)
+                }
             val compudefaultvalue = this.compudefaultvalue?.offset()
 
             CompuPhysToInternal.startCompuPhysToInternal(builder)
@@ -1085,9 +1191,10 @@ class DatabaseWriter(
     private fun COMPUINTERNALTOPHYS.offset(): Int =
         cachedObjects.getOrPut(this) {
             val progcode = this.progcode?.offset()
-            val compuscales = this.compuscales?.compuscale?.map { it.offset() }?.toIntArray()?.let {
-                CompuInternalToPhys.createCompuScalesVector(builder, it)
-            }
+            val compuscales =
+                this.compuscales?.compuscale?.map { it.offset() }?.toIntArray()?.let {
+                    CompuInternalToPhys.createCompuScalesVector(builder, it)
+                }
             val compudefaultvalue = this.compudefaultvalue?.offset()
 
             CompuInternalToPhys.startCompuInternalToPhys(builder)
@@ -1097,8 +1204,8 @@ class DatabaseWriter(
             CompuInternalToPhys.endCompuInternalToPhys(builder)
         }
 
-    private fun COMPUSCALE.offset(): Int {
-        return cachedObjects.getOrPut(this) {
+    private fun COMPUSCALE.offset(): Int =
+        cachedObjects.getOrPut(this) {
             val shortLabel = this.shortlabel?.offset()
             val lowerLimit = this.lowerlimit?.offset()
             val upperLimit = this.upperlimit?.offset()
@@ -1115,7 +1222,6 @@ class DatabaseWriter(
             rationalCoEffs?.let { CompuScale.addRationalCoEffs(builder, it) }
             CompuScale.endCompuScale(builder)
         }
-    }
 
     private fun LIMIT.offset(): Int =
         cachedObjects.getOrPut(this) {
@@ -1145,8 +1251,8 @@ class DatabaseWriter(
             CompuValues.endCompuValues(builder)
         }
 
-    private fun COMPUCONST.offset(): Int {
-        return cachedObjects.getOrPut(this) {
+    private fun COMPUCONST.offset(): Int =
+        cachedObjects.getOrPut(this) {
             val vtValue = this.vt?.value?.offset()
             val vtTi = this.vt?.ti?.offset()
 
@@ -1162,28 +1268,38 @@ class DatabaseWriter(
             }
             CompuValues.endCompuValues(builder)
         }
-    }
 
     private fun COMPUDEFAULTVALUE.offset(): Int =
         cachedObjects.getOrPut(this) {
             val vtTi = this.vt?.ti?.offset()
             val vtValue = this.vt?.value?.offset()
-            val values = if (vtValue != null || vtTi != null || this.v?.value != null) {
-                CompuValues.startCompuValues(builder)
-                this.v?.value?.let {
-                    CompuValues.addV(builder, it)
+            val values =
+                if (vtValue != null || vtTi != null || this.v?.value != null) {
+                    CompuValues.startCompuValues(builder)
+                    this.v?.value?.let {
+                        CompuValues.addV(builder, it)
+                    }
+                    vtValue?.let {
+                        CompuValues.addVt(builder, it)
+                    }
+                    vtTi?.let {
+                        CompuValues.addVtTi(builder, it)
+                    }
+                    CompuValues.endCompuValues(builder)
+                } else {
+                    null
                 }
-                vtValue?.let {
-                    CompuValues.addVt(builder, it)
-                }
-                vtTi?.let {
-                    CompuValues.addVtTi(builder, it)
-                }
-                CompuValues.endCompuValues(builder)
-            } else null
 
-            val invVtTi = this.compuinversevalue?.vt?.ti?.offset()
-            val invVtValue = this.compuinversevalue?.vt?.value?.offset()
+            val invVtTi =
+                this.compuinversevalue
+                    ?.vt
+                    ?.ti
+                    ?.offset()
+            val invVtValue =
+                this.compuinversevalue
+                    ?.vt
+                    ?.value
+                    ?.offset()
             val inverseValues =
                 if (invVtTi != null || invVtValue != null || this.compuinversevalue?.vt?.value != null) {
                     CompuValues.startCompuValues(builder)
@@ -1197,7 +1313,9 @@ class DatabaseWriter(
                         CompuValues.addVtTi(builder, it)
                     }
                     CompuValues.endCompuValues(builder)
-                } else null
+                } else {
+                    null
+                }
 
             CompuDefaultValue.startCompuDefaultValue(builder)
             values?.let {
@@ -1211,12 +1329,14 @@ class DatabaseWriter(
 
     private fun COMPURATIONALCOEFFS.offset(): Int =
         cachedObjects.getOrPut(this) {
-            val numerator = this.compunumerator?.v?.mapNotNull { it.value }?.let {
-                CompuRationalCoEffs.createNumeratorVector(builder, it.toDoubleArray())
-            }
-            val denominator = this.compudenominator?.v?.mapNotNull { it.value }?.let {
-                CompuRationalCoEffs.createDenominatorVector(builder, it.toDoubleArray())
-            }
+            val numerator =
+                this.compunumerator?.v?.mapNotNull { it.value }?.let {
+                    CompuRationalCoEffs.createNumeratorVector(builder, it.toDoubleArray())
+                }
+            val denominator =
+                this.compudenominator?.v?.mapNotNull { it.value }?.let {
+                    CompuRationalCoEffs.createDenominatorVector(builder, it.toDoubleArray())
+                }
             CompuRationalCoEffs.startCompuRationalCoEffs(builder)
             numerator?.let { CompuRationalCoEffs.addNumerator(builder, it) }
             denominator?.let { CompuRationalCoEffs.addDenominator(builder, it) }
@@ -1228,18 +1348,21 @@ class DatabaseWriter(
         val physicalType = this.physicaltype.offset()
         val compuMethod = this.compumethod.offset()
 
-        val dtcs = this.dtcs.dtcproxy?.map {
-            if (it is schema.odx.DTC) {
-                it.offset()
-            } else if (it is ODXLINK) {
-                val dop = odx.dtcs[it.idref] ?: throw IllegalStateException("Couldn't find DTC ${it.idref}")
-                dop.offset()
-            } else {
-                throw IllegalStateException("Unsupported DTC type ${it::class.java.simpleName}")
-            }
-        }?.toIntArray()?.let {
-            DTCDOP.createDtcsVector(builder, it)
-        }
+        val dtcs =
+            this.dtcs.dtcproxy
+                ?.map {
+                    if (it is schema.odx.DTC) {
+                        it.offset()
+                    } else if (it is ODXLINK) {
+                        val dop = odx.dtcs[it.idref] ?: error("Couldn't find DTC ${it.idref}")
+                        dop.offset()
+                    } else {
+                        error("Unsupported DTC type ${it::class.java.simpleName}")
+                    }
+                }?.toIntArray()
+                ?.let {
+                    DTCDOP.createDtcsVector(builder, it)
+                }
 
         DTCDOP.startDTCDOP(builder)
         DTCDOP.addDiagCodedType(builder, diagCodedType)
@@ -1253,7 +1376,12 @@ class DatabaseWriter(
     private fun schema.odx.MUX.toMUXDOP(): Int {
         val switchKey = this.switchkey.offset()
         val defaultCase = this.defaultcase?.offset()
-        val cases = this.cases?.case?.map { it.offset() }?.toIntArray()?.let { MUXDOP.createCasesVector(builder, it) }
+        val cases =
+            this.cases
+                ?.case
+                ?.map { it.offset() }
+                ?.toIntArray()
+                ?.let { MUXDOP.createCasesVector(builder, it) }
 
         MUXDOP.startMUXDOP(builder)
         MUXDOP.addBytePosition(builder, this.byteposition.toUInt())
@@ -1278,11 +1406,15 @@ class DatabaseWriter(
     }
 
     private fun STRUCTURE.toStructure(): Int {
-        val params = this.params?.param?.map {
-            it.offset()
-        }?.toIntArray()?.let {
-            Structure.createParamsVector(builder, it)
-        }
+        val params =
+            this.params
+                ?.param
+                ?.map {
+                    it.offset()
+                }?.toIntArray()
+                ?.let {
+                    Structure.createParamsVector(builder, it)
+                }
 
         Structure.startStructure(builder)
         this.bytesize?.let { Structure.addByteSize(builder, it.toUInt()) }
@@ -1294,11 +1426,13 @@ class DatabaseWriter(
 
     private fun DETERMINENUMBEROFITEMS.offset(): Int =
         cachedObjects.getOrPut(this) {
-            val dop = this.dataobjectpropref?.let {
-                val dop =
-                    odx.combinedDataObjectProps[it.idref] ?: throw IllegalStateException("Couldn't find ${it.idref}")
-                dop.offset()
-            }
+            val dop =
+                this.dataobjectpropref?.let {
+                    val dop =
+                        odx.combinedDataObjectProps[it.idref]
+                            ?: error("Couldn't find ${it.idref}")
+                    dop.offset()
+                }
 
             DetermineNumberOfItems.startDetermineNumberOfItems(builder)
             DetermineNumberOfItems.addBytePosition(builder, this.byteposition.toUInt())
@@ -1324,27 +1458,39 @@ class DatabaseWriter(
 
     private fun AUDIENCE.offset(): Int =
         cachedObjects.getOrPut(this) {
-            val enabledAudiences = this.enabledaudiencerefs?.enabledaudienceref?.let { aa ->
-                Audience.createEnabledAudiencesVector(builder, aa.map {
-                    val aud = odx.additionalAudiences[it.idref]
-                        ?: throw IllegalStateException("Can't find additional audience ${it.idref}")
-                    aud.offset()
-                }.toIntArray())
-            }
+            val enabledAudiences =
+                this.enabledaudiencerefs?.enabledaudienceref?.let { aa ->
+                    Audience.createEnabledAudiencesVector(
+                        builder,
+                        aa
+                            .map {
+                                val aud =
+                                    odx.additionalAudiences[it.idref]
+                                        ?: error("Can't find additional audience ${it.idref}")
+                                aud.offset()
+                            }.toIntArray(),
+                    )
+                }
 
-            val disabledAudiences = this.disabledaudiencerefs?.disabledaudienceref?.let { aa ->
-                Audience.createDisabledAudiencesVector(builder, aa.map {
-                    val aud = odx.additionalAudiences[it.idref]
-                        ?: throw IllegalStateException("Can't find additional audience ${it.idref}")
-                    aud.offset()
-                }.toIntArray())
-            }
+            val disabledAudiences =
+                this.disabledaudiencerefs?.disabledaudienceref?.let { aa ->
+                    Audience.createDisabledAudiencesVector(
+                        builder,
+                        aa
+                            .map {
+                                val aud =
+                                    odx.additionalAudiences[it.idref]
+                                        ?: error("Can't find additional audience ${it.idref}")
+                                aud.offset()
+                            }.toIntArray(),
+                    )
+                }
 
             Audience.startAudience(builder)
             enabledAudiences?.let {
                 Audience.addEnabledAudiences(
                     builder,
-                    it
+                    it,
                 )
             }
 
@@ -1364,7 +1510,7 @@ class DatabaseWriter(
     private fun PRECONDITIONSTATEREF.offset(): Int =
         cachedObjects.getOrPut(this) {
             val state =
-                odx.states[this.idref]?.offset() ?: throw IllegalStateException("Couldn't find STATE ${this.idref}")
+                odx.states[this.idref]?.offset() ?: error("Couldn't find STATE ${this.idref}")
             val value = this.value?.offset()
             val inParamIfSnRef = this.inparamifsnref?.shortname?.offset()
             val inParamIfSnPathRef = this.inparamifsnpathref?.shortnamepath?.offset()
@@ -1380,11 +1526,13 @@ class DatabaseWriter(
     private fun STATETRANSITIONREF.offset(): Int =
         cachedObjects.getOrPut(this) {
             val value = this.value?.offset()
-            val stateTransition = this.idref?.let {
-                val stateTransition = odx.stateTransitions[this.idref]
-                    ?: throw IllegalStateException("Couldn't find STATETRANSITION ${this.idref}")
-                stateTransition.offset()
-            }
+            val stateTransition =
+                this.idref?.let {
+                    val stateTransition =
+                        odx.stateTransitions[this.idref]
+                            ?: error("Couldn't find STATETRANSITION ${this.idref}")
+                    stateTransition.offset()
+                }
 
             StateTransitionRef.startStateTransitionRef(builder)
 
@@ -1400,11 +1548,13 @@ class DatabaseWriter(
             val longName = this.longname?.offset()
             val physicalDefaultValue = this.physicaldefaultvalue?.offset()
             val semantic = this.semantic?.offset()
-            val dop = this.dopbaseref?.let {
-                val dop =
-                    odx.combinedDataObjectProps[it.idref] ?: throw IllegalStateException("Can't find DOP ${it.idref}")
-                dop.offset()
-            }
+            val dop =
+                this.dopbaseref?.let {
+                    val dop =
+                        odx.combinedDataObjectProps[it.idref]
+                            ?: error("Can't find DOP ${it.idref}")
+                    dop.offset()
+                }
 
             JobParam.startJobParam(builder)
             JobParam.addShortName(builder, shortName)
@@ -1420,11 +1570,13 @@ class DatabaseWriter(
             val shortName = this.shortname.offset()
             val longName = this.longname?.offset()
             val semantic = this.semantic?.offset()
-            val dop = this.dopbaseref?.let {
-                val dop =
-                    odx.combinedDataObjectProps[it.idref] ?: throw IllegalStateException("Can't find DOP ${it.idref}")
-                dop.offset()
-            }
+            val dop =
+                this.dopbaseref?.let {
+                    val dop =
+                        odx.combinedDataObjectProps[it.idref]
+                            ?: error("Can't find DOP ${it.idref}")
+                    dop.offset()
+                }
 
             JobParam.startJobParam(builder)
             JobParam.addShortName(builder, shortName)
@@ -1438,11 +1590,13 @@ class DatabaseWriter(
         cachedObjects.getOrPut(this) {
             val shortName = this.shortname.offset()
             val longName = this.longname?.offset()
-            val dop = this.dopbaseref?.let {
-                val dop =
-                    odx.combinedDataObjectProps[it.idref] ?: throw IllegalStateException("Can't find DOP ${it.idref}")
-                dop.offset()
-            }
+            val dop =
+                this.dopbaseref?.let {
+                    val dop =
+                        odx.combinedDataObjectProps[it.idref]
+                            ?: error("Can't find DOP ${it.idref}")
+                    dop.offset()
+                }
 
             JobParam.startJobParam(builder)
             JobParam.addShortName(builder, shortName)
@@ -1455,31 +1609,49 @@ class DatabaseWriter(
         val shortName = this.shortname.offset()
         val longName = this.longname?.offset()
         val diagClass = this.diagnosticclass?.toFileFormatEnum()
-        val functClasses = this.functclassrefs?.functclassref?.map {
-            val functClass =
-                odx.functClasses[it.idref] ?: throw IllegalStateException("Couldn't find funct class ${it.idref}")
-            functClass.offset()
-        }?.toIntArray()?.let {
-            DiagComm.createFunctClassVector(builder, it)
-        }
+        val functClasses =
+            this.functclassrefs
+                ?.functclassref
+                ?.map {
+                    val functClass =
+                        odx.functClasses[it.idref]
+                            ?: error("Couldn't find funct class ${it.idref}")
+                    functClass.offset()
+                }?.toIntArray()
+                ?.let {
+                    DiagComm.createFunctClassVector(builder, it)
+                }
         val semantic = this.semantic?.offset()
-        val preconditionStateRefs = this.preconditionstaterefs?.preconditionstateref?.map {
-            it.offset()
-        }?.toIntArray()?.let {
-            DiagComm.createPreConditionStateRefsVector(builder, it)
-        }
-        val stateTransitionRefs = this.statetransitionrefs?.statetransitionref?.map {
-            it.offset()
-        }?.toIntArray()?.let {
-            DiagComm.createStateTransitionRefsVector(builder, it)
-        }
-        val protocolRefs = this.protocolsnrefs?.protocolsnref?.map {
-            val protocol = odx.protocols.values.firstOrNull { p -> p.shortname == it.shortname }
-                ?: throw IllegalStateException("Couldn't find protocol ${it.shortname}")
-            protocol.offset()
-        }?.toIntArray()?.let {
-            DiagComm.createProtocolsVector(builder, it)
-        }
+        val preconditionStateRefs =
+            this.preconditionstaterefs
+                ?.preconditionstateref
+                ?.map {
+                    it.offset()
+                }?.toIntArray()
+                ?.let {
+                    DiagComm.createPreConditionStateRefsVector(builder, it)
+                }
+        val stateTransitionRefs =
+            this.statetransitionrefs
+                ?.statetransitionref
+                ?.map {
+                    it.offset()
+                }?.toIntArray()
+                ?.let {
+                    DiagComm.createStateTransitionRefsVector(builder, it)
+                }
+        val protocolRefs =
+            this.protocolsnrefs
+                ?.protocolsnref
+                ?.map {
+                    val protocol =
+                        odx.protocols.values.firstOrNull { p -> p.shortname == it.shortname }
+                            ?: error("Couldn't find protocol ${it.shortname}")
+                    protocol.offset()
+                }?.toIntArray()
+                ?.let {
+                    DiagComm.createProtocolsVector(builder, it)
+                }
         val audience = this.audience?.offset()
         val sdgs = this.sdgs?.offset()
 
@@ -1503,26 +1675,42 @@ class DatabaseWriter(
     private fun SINGLEECUJOB.offset(): Int =
         cachedObjects.getOrPut(this) {
             val diagComm = (this as DIAGCOMM).offsetInternal()
-            val progCodes = this.progcodes?.progcode?.map {
-                it.offset()
-            }?.toIntArray()?.let {
-                SingleEcuJob.createProgCodesVector(builder, it)
-            }
-            val inputParams = this.inputparams?.inputparam?.map {
-                it.offset()
-            }?.toIntArray()?.let {
-                SingleEcuJob.createInputParamsVector(builder, it)
-            }
-            val outputParams = this.outputparams?.outputparam?.map {
-                it.offset()
-            }?.toIntArray()?.let {
-                SingleEcuJob.createOutputParamsVector(builder, it)
-            }
-            val negOutputParams = this.negoutputparams?.negoutputparam?.map {
-                it.offset()
-            }?.toIntArray()?.let {
-                SingleEcuJob.createNegOutputParamsVector(builder, it)
-            }
+            val progCodes =
+                this.progcodes
+                    ?.progcode
+                    ?.map {
+                        it.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        SingleEcuJob.createProgCodesVector(builder, it)
+                    }
+            val inputParams =
+                this.inputparams
+                    ?.inputparam
+                    ?.map {
+                        it.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        SingleEcuJob.createInputParamsVector(builder, it)
+                    }
+            val outputParams =
+                this.outputparams
+                    ?.outputparam
+                    ?.map {
+                        it.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        SingleEcuJob.createOutputParamsVector(builder, it)
+                    }
+            val negOutputParams =
+                this.negoutputparams
+                    ?.negoutputparam
+                    ?.map {
+                        it.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        SingleEcuJob.createNegOutputParamsVector(builder, it)
+                    }
 
             SingleEcuJob.startSingleEcuJob(builder)
             SingleEcuJob.addDiagComm(builder, diagComm)
@@ -1537,45 +1725,66 @@ class DatabaseWriter(
         val shortName = this.shortname.offset()
         val longName = this.longname?.offset()
         val sdgs = this.sdgs?.offset()
-        val functClasses = this.functclasss?.functclass?.map {
-            it.offset()
-        }?.toIntArray()?.let {
-            DiagLayer.createFunctClassesVector(builder, it)
-        }
-        val additionalAudiences = this.additionalaudiences?.additionalaudience?.map {
-            it.offset()
-        }?.toIntArray()?.let {
-            DiagLayer.createAdditionalAudiencesVector(builder, it)
-        }
-        val resolvedLinks: List<DIAGCOMM> = this.diagcomms?.diagcommproxy?.filterIsInstance<ODXLINK>()?.map {
-            odx.diagServices[it.idref] ?: odx.singleEcuJobs[it.idref]
-            ?: throw IllegalStateException("Couldn't find reference ${it.idref}")
-        } ?: emptyList()
+        val functClasses =
+            this.functclasss
+                ?.functclass
+                ?.map {
+                    it.offset()
+                }?.toIntArray()
+                ?.let {
+                    DiagLayer.createFunctClassesVector(builder, it)
+                }
+        val additionalAudiences =
+            this.additionalaudiences
+                ?.additionalaudience
+                ?.map {
+                    it.offset()
+                }?.toIntArray()
+                ?.let {
+                    DiagLayer.createAdditionalAudiencesVector(builder, it)
+                }
+        val resolvedLinks: List<DIAGCOMM> =
+            this.diagcomms?.diagcommproxy?.filterIsInstance<ODXLINK>()?.map {
+                odx.diagServices[it.idref] ?: odx.singleEcuJobs[it.idref]
+                    ?: error("Couldn't find reference ${it.idref}")
+            } ?: emptyList()
 
-        val diagServicesRaw = resolvedLinks.filterIsInstance<DIAGSERVICE>().map {
-            it.offset()
-        } + (this.diagcomms?.diagcommproxy?.filterIsInstance<DIAGSERVICE>()?.map {
-            it.offset()
-        } ?: emptyList())
+        val diagServicesRaw =
+            resolvedLinks.filterIsInstance<DIAGSERVICE>().map {
+                it.offset()
+            } + (
+                this.diagcomms?.diagcommproxy?.filterIsInstance<DIAGSERVICE>()?.map {
+                    it.offset()
+                } ?: emptyList()
+            )
 
-        val diagServices = diagServicesRaw.toIntArray().let {
-            DiagLayer.createDiagServicesVector(builder, it)
-        }
+        val diagServices =
+            diagServicesRaw.toIntArray().let {
+                DiagLayer.createDiagServicesVector(builder, it)
+            }
 
-        val singleEcuJobsRaw = resolvedLinks.filterIsInstance<SINGLEECUJOB>().map {
-            it.offset()
-        } + (this.diagcomms?.diagcommproxy?.filterIsInstance<SINGLEECUJOB>()?.map {
-            it.offset()
-        } ?: emptyList())
+        val singleEcuJobsRaw =
+            resolvedLinks.filterIsInstance<SINGLEECUJOB>().map {
+                it.offset()
+            } + (
+                this.diagcomms?.diagcommproxy?.filterIsInstance<SINGLEECUJOB>()?.map {
+                    it.offset()
+                } ?: emptyList()
+            )
 
-        val singleEcuJobs = singleEcuJobsRaw.toIntArray().let {
-            DiagLayer.createSingleEcuJobsVector(builder, it)
-        }
-        val stateCharts = statecharts?.statechart?.map {
-            it.offset()
-        }?.toIntArray()?.let {
-            DiagLayer.createStateChartsVector(builder, it)
-        }
+        val singleEcuJobs =
+            singleEcuJobsRaw.toIntArray().let {
+                DiagLayer.createSingleEcuJobsVector(builder, it)
+            }
+        val stateCharts =
+            statecharts
+                ?.statechart
+                ?.map {
+                    it.offset()
+                }?.toIntArray()
+                ?.let {
+                    DiagLayer.createStateChartsVector(builder, it)
+                }
 
         DiagLayer.startDiagLayer(builder)
         DiagLayer.addShortName(builder, shortName)
@@ -1590,18 +1799,19 @@ class DatabaseWriter(
         return DiagLayer.endDiagLayer(builder)
     }
 
-    private fun DIAGLAYER.offsetType(): Int {
-        return this.offsetInternal(null)
-    }
+    private fun DIAGLAYER.offsetType(): Int = this.offsetInternal(null)
 
     private fun HIERARCHYELEMENT.offsetType(): Int {
         // comparam refs are for hierarchyelements
-        val comParamRefs = this.comparamrefs?.comparamref?.map {
-            it.offset()
-        }?.toIntArray()?.let {
-            DiagLayer.createComParamRefsVector(builder, it)
-        }
-
+        val comParamRefs =
+            this.comparamrefs
+                ?.comparamref
+                ?.map {
+                    it.offset()
+                }?.toIntArray()
+                ?.let {
+                    DiagLayer.createComParamRefsVector(builder, it)
+                }
 
         val diagLayer = (this as DIAGLAYER).offsetInternal(comParamRefs)
         return diagLayer
@@ -1610,16 +1820,25 @@ class DatabaseWriter(
     private fun BASEVARIANT.offset(): Int =
         cachedObjects.getOrPut(this) {
             val diagLayer = (this as HIERARCHYELEMENT).offsetType()
-            val pattern = this.basevariantpattern?.matchingbasevariantparameters?.matchingbasevariantparameter?.map {
-                it.offset()
-            }?.toIntArray()?.let {
-                Variant.createVariantPatternVector(builder, it)
-            }
-            val parentRefs = this.parentrefs?.parentref?.map {
-                it.offset()
-            }?.toIntArray()?.let {
-                Variant.createParentRefsVector(builder, it)
-            }
+            val pattern =
+                this.basevariantpattern
+                    ?.matchingbasevariantparameters
+                    ?.matchingbasevariantparameter
+                    ?.map {
+                        it.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        Variant.createVariantPatternVector(builder, it)
+                    }
+            val parentRefs =
+                this.parentrefs
+                    ?.parentref
+                    ?.map {
+                        it.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        Variant.createParentRefsVector(builder, it)
+                    }
 
             Variant.startVariant(builder)
             Variant.addDiagLayer(builder, diagLayer)
@@ -1632,16 +1851,24 @@ class DatabaseWriter(
     private fun ECUVARIANT.offset(): Int =
         cachedObjects.getOrPut(this) {
             val diagLayer = (this as HIERARCHYELEMENT).offsetType()
-            val pattern = this.ecuvariantpatterns?.ecuvariantpattern?.map {
-                it.offset()
-            }?.toIntArray()?.let {
-                Variant.createVariantPatternVector(builder, it)
-            }
-            val parentRefs = this.parentrefs?.parentref?.map {
-                it.offset()
-            }?.toIntArray()?.let {
-                Variant.createParentRefsVector(builder, it)
-            }
+            val pattern =
+                this.ecuvariantpatterns
+                    ?.ecuvariantpattern
+                    ?.map {
+                        it.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        Variant.createVariantPatternVector(builder, it)
+                    }
+            val parentRefs =
+                this.parentrefs
+                    ?.parentref
+                    ?.map {
+                        it.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        Variant.createParentRefsVector(builder, it)
+                    }
 
             Variant.startVariant(builder)
             Variant.addDiagLayer(builder, diagLayer)
@@ -1674,52 +1901,74 @@ class DatabaseWriter(
         }
 
     fun PARENTREF.offset(): Int {
-        val resolved = odx.basevariants[this.idref] ?: odx.ecuvariants[this.idref] ?: odx.protocols[this.idref]
-        ?: odx.functionalGroups[this.idref] ?: odx.tables[this.idref] ?: odx.ecuSharedDatas[this.idref]
-        val resolvedOffs = when (resolved) {
-            is BASEVARIANT -> resolved.offset()
-            is ECUVARIANT -> resolved.offset()
-            is PROTOCOL -> resolved.offset()
-            is TABLE -> resolved.offset()
-            is FUNCTIONALGROUP -> resolved.offset()
-            is ECUSHAREDDATA -> resolved.offset()
-            else -> throw UnsupportedOperationException("Unsupported idref type: ${this.idref} / ${this.doctype?.value()} ($resolved)")
-        }
-        val resolvedOffsType = when (resolved) {
-            is BASEVARIANT -> ParentRefType.Variant
-            is ECUVARIANT -> ParentRefType.Variant
-            is PROTOCOL -> ParentRefType.Protocol
-            is TABLE -> ParentRefType.TableDop
-            is FUNCTIONALGROUP -> ParentRefType.FunctionalGroup
-            is ECUSHAREDDATA -> ParentRefType.EcuSharedData
-            else -> throw UnsupportedOperationException("Unsupported idref type: ${this.idref} / ${this.doctype?.value()} ($resolved)")
-        }
-        val notInheritedDiagCommShortNames = this.notinheriteddiagcomms?.notinheriteddiagcomm?.map {
-            it.diagcommsnref.shortname.offset()
-        }?.toIntArray()?.let {
-            ParentRef.createNotInheritedDiagCommShortNamesVector(builder, it)
-        }
-        val notInheritedDopsShortNames = this.notinheriteddops?.notinheriteddop?.map {
-            it.dopbasesnref.shortname.offset()
-        }?.toIntArray()?.let {
-            ParentRef.createNotInheritedDopsShortNamesVector(builder, it)
-        }
-        val notInheritedTablesShortNames = this.notinheritedtables?.notinheritedtable?.map {
-            it.tablesnref.shortname.offset()
-        }?.toIntArray()?.let {
-            ParentRef.createNotInheritedTablesShortNamesVector(builder, it)
-        }
-        val notInheritedVariablesShortNames = this.notinheritedvariables?.notinheritedvariable?.map {
-            it.diagvariablesnref.shortname.offset()
-        }?.toIntArray()?.let {
-            ParentRef.createNotInheritedVariablesShortNamesVector(builder, it)
-        }
-        val notInheritedGlobalNegResponseShortNames =
-            this.notinheritedglobalnegresponses?.notinheritedglobalnegresponse?.map {
-                it.globalnegresponsesnref.shortname.offset()
-            }?.toIntArray()?.let {
-                ParentRef.createNotInheritedGlobalNegResponsesShortNamesVector(builder, it)
+        val resolved =
+            odx.basevariants[this.idref] ?: odx.ecuvariants[this.idref] ?: odx.protocols[this.idref]
+                ?: odx.functionalGroups[this.idref] ?: odx.tables[this.idref] ?: odx.ecuSharedDatas[this.idref]
+        val resolvedOffs =
+            when (resolved) {
+                is BASEVARIANT -> resolved.offset()
+                is ECUVARIANT -> resolved.offset()
+                is PROTOCOL -> resolved.offset()
+                is TABLE -> resolved.offset()
+                is FUNCTIONALGROUP -> resolved.offset()
+                is ECUSHAREDDATA -> resolved.offset()
+                else -> throw UnsupportedOperationException("Unsupported idref type: ${this.idref} / ${this.doctype?.value()} ($resolved)")
             }
+        val resolvedOffsType =
+            when (resolved) {
+                is BASEVARIANT -> ParentRefType.Variant
+                is ECUVARIANT -> ParentRefType.Variant
+                is PROTOCOL -> ParentRefType.Protocol
+                is TABLE -> ParentRefType.TableDop
+                is FUNCTIONALGROUP -> ParentRefType.FunctionalGroup
+                is ECUSHAREDDATA -> ParentRefType.EcuSharedData
+                else -> throw UnsupportedOperationException("Unsupported idref type: ${this.idref} / ${this.doctype?.value()} ($resolved)")
+            }
+        val notInheritedDiagCommShortNames =
+            this.notinheriteddiagcomms
+                ?.notinheriteddiagcomm
+                ?.map {
+                    it.diagcommsnref.shortname.offset()
+                }?.toIntArray()
+                ?.let {
+                    ParentRef.createNotInheritedDiagCommShortNamesVector(builder, it)
+                }
+        val notInheritedDopsShortNames =
+            this.notinheriteddops
+                ?.notinheriteddop
+                ?.map {
+                    it.dopbasesnref.shortname.offset()
+                }?.toIntArray()
+                ?.let {
+                    ParentRef.createNotInheritedDopsShortNamesVector(builder, it)
+                }
+        val notInheritedTablesShortNames =
+            this.notinheritedtables
+                ?.notinheritedtable
+                ?.map {
+                    it.tablesnref.shortname.offset()
+                }?.toIntArray()
+                ?.let {
+                    ParentRef.createNotInheritedTablesShortNamesVector(builder, it)
+                }
+        val notInheritedVariablesShortNames =
+            this.notinheritedvariables
+                ?.notinheritedvariable
+                ?.map {
+                    it.diagvariablesnref.shortname.offset()
+                }?.toIntArray()
+                ?.let {
+                    ParentRef.createNotInheritedVariablesShortNamesVector(builder, it)
+                }
+        val notInheritedGlobalNegResponseShortNames =
+            this.notinheritedglobalnegresponses
+                ?.notinheritedglobalnegresponse
+                ?.map {
+                    it.globalnegresponsesnref.shortname.offset()
+                }?.toIntArray()
+                ?.let {
+                    ParentRef.createNotInheritedGlobalNegResponsesShortNamesVector(builder, it)
+                }
 
         ParentRef.startParentRef(builder)
         ParentRef.addRef(builder, resolvedOffs)
@@ -1731,21 +1980,24 @@ class DatabaseWriter(
         notInheritedGlobalNegResponseShortNames?.let {
             ParentRef.addNotInheritedGlobalNegResponsesShortNames(
                 builder,
-                it
+                it,
             )
         }
         return ParentRef.endParentRef(builder)
     }
 
-
     private fun FUNCTIONALGROUP.offset(): Int =
         cachedObjects.getOrPut(this) {
             val diagLayer = (this as HIERARCHYELEMENT).offsetType()
-            val parentRefs = this.parentrefs?.parentref?.map {
-                it.offset()
-            }?.toIntArray()?.let {
-                FunctionalGroup.createParentRefsVector(builder, it)
-            }
+            val parentRefs =
+                this.parentrefs
+                    ?.parentref
+                    ?.map {
+                        it.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        FunctionalGroup.createParentRefsVector(builder, it)
+                    }
 
             FunctionalGroup.startFunctionalGroup(builder)
             FunctionalGroup.addDiagLayer(builder, diagLayer)
@@ -1756,20 +2008,21 @@ class DatabaseWriter(
     private fun MATCHINGBASEVARIANTPARAMETER.offset(): Int =
         cachedObjects.getOrPut(this) {
             if (this.outparamifsnref != null) {
-                throw IllegalStateException("Unsupported outparam if sn ref")
+                error("Unsupported outparam if sn ref")
             }
 
             if (this.outparamifsnpathref != null) {
-                throw IllegalStateException("Unsupported outparam if sn path ref")
+                error("Unsupported outparam if sn path ref")
             }
 
             val expectedValue = this.expectedvalue.offset()
             lateinit var diagService: DIAGSERVICE
-            val diagServiceOffset = this.diagcommsnref.shortname.let { shortname ->
-                diagService = odx.diagServices.values.firstOrNull { it.shortname == shortname }
-                    ?: throw IllegalStateException("Couldn't find diag service ${shortname}")
-                diagService.offset()
-            }
+            val diagServiceOffset =
+                this.diagcommsnref.shortname.let { shortname ->
+                    diagService = odx.diagServices.values.firstOrNull { it.shortname == shortname }
+                        ?: error("Couldn't find diag service $shortname")
+                    diagService.offset()
+                }
 
             MatchingParameter.startMatchingParameter(builder)
             MatchingParameter.addExpectedValue(builder, expectedValue)
@@ -1782,26 +2035,30 @@ class DatabaseWriter(
         cachedObjects.getOrPut(this) {
             val expectedValue = this.expectedvalue?.offset()
             lateinit var diagService: DIAGSERVICE
-            val diagServiceOffset = this.diagcommsnref.shortname.let { shortname ->
-                diagService = odx.diagServices.values.firstOrNull { it.shortname == shortname }
-                    ?: throw IllegalStateException("Couldn't find diag service ${shortname}")
-                diagService.offset()
-            }
-            val outParam = this.outparamifsnref?.shortname?.let { expectedShortName ->
-                diagService.posresponserefs?.posresponseref?.flatMap { pr ->
-                    val posResponse =
-                        odx.posResponses[pr.idref]
-                            ?: throw IllegalStateException("Couldn't find pos response ${pr.idref}")
-                    posResponse.params?.param ?: emptyList()
-                }?.firstOrNull { params ->
-                    params.shortname == expectedShortName
-                }?.offset() ?: throw IllegalStateException("Couldn't find param for shortName $expectedShortName")
-            }
+            val diagServiceOffset =
+                this.diagcommsnref.shortname.let { shortname ->
+                    diagService = odx.diagServices.values.firstOrNull { it.shortname == shortname }
+                        ?: error("Couldn't find diag service $shortname")
+                    diagService.offset()
+                }
+            val outParam =
+                this.outparamifsnref?.shortname?.let { expectedShortName ->
+                    diagService.posresponserefs
+                        ?.posresponseref
+                        ?.flatMap { pr ->
+                            val posResponse =
+                                odx.posResponses[pr.idref]
+                                    ?: error("Couldn't find pos response ${pr.idref}")
+                            posResponse.params?.param ?: emptyList()
+                        }?.firstOrNull { params ->
+                            params.shortname == expectedShortName
+                        }?.offset()
+                        ?: error("Couldn't find param for shortName $expectedShortName")
+                }
 
             this.outparamifsnpathref?.let {
-                throw IllegalStateException("Unsupported outparam if sn path ref")
+                error("Unsupported outparam if sn path ref")
             }
-
 
             MatchingParameter.startMatchingParameter(builder)
             diagServiceOffset.let { MatchingParameter.addDiagService(builder, it) }
@@ -1812,11 +2069,15 @@ class DatabaseWriter(
 
     private fun ECUVARIANTPATTERN.offset(): Int =
         cachedObjects.getOrPut(this) {
-            val matchingParameter = this.matchingparameters?.matchingparameter?.map {
-                it.offset()
-            }?.toIntArray()?.let {
-                Variant.createVariantPatternVector(builder, it)
-            }
+            val matchingParameter =
+                this.matchingparameters
+                    ?.matchingparameter
+                    ?.map {
+                        it.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        Variant.createVariantPatternVector(builder, it)
+                    }
             VariantPattern.startVariantPattern(builder)
             matchingParameter?.let { VariantPattern.addMatchingParameter(builder, matchingParameter) }
             VariantPattern.endVariantPattern(builder)
@@ -1824,22 +2085,34 @@ class DatabaseWriter(
 
     private fun COMPARAMSUBSET.offset(): Int =
         cachedObjects.getOrPut(this) {
-            val comParams = this.comparams?.comparam?.map {
-                it.offset()
-            }?.toIntArray()?.let {
-                ComParamSubSet.createComParamsVector(builder, it)
-            }
-            val complexComParams = this.complexcomparams?.complexcomparam?.map {
-                it.offset()
-            }?.toIntArray()?.let {
-                ComParamSubSet.createComplexComParamsVector(builder, it)
-            }
-            val dops = this.dataobjectprops?.dataobjectprop?.map {
-                val dop = odx.dataObjectProps[it.id] ?: throw IllegalStateException("Can't find DOP ${it.id}")
-                dop.offset()
-            }?.toIntArray()?.let {
-                ComParamSubSet.createDataObjectPropsVector(builder, it)
-            }
+            val comParams =
+                this.comparams
+                    ?.comparam
+                    ?.map {
+                        it.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        ComParamSubSet.createComParamsVector(builder, it)
+                    }
+            val complexComParams =
+                this.complexcomparams
+                    ?.complexcomparam
+                    ?.map {
+                        it.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        ComParamSubSet.createComplexComParamsVector(builder, it)
+                    }
+            val dops =
+                this.dataobjectprops
+                    ?.dataobjectprop
+                    ?.map {
+                        val dop = odx.dataObjectProps[it.id] ?: error("Can't find DOP ${it.id}")
+                        dop.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        ComParamSubSet.createDataObjectPropsVector(builder, it)
+                    }
             val unitSpec = this.unitspec?.offset()
 
             ComParamSubSet.startComParamSubSet(builder)
@@ -1854,12 +2127,16 @@ class DatabaseWriter(
         cachedObjects.getOrPut(this) {
             val shortName = this.shortname.offset()
             val longName = this.longname?.offset()
-            val units = this.unitrefs?.unitref?.map {
-                val unit = odx.units[it.idref] ?: throw IllegalStateException("Couldn't find unit $it")
-                unit.offset()
-            }?.toIntArray()?.let {
-                UnitGroup.createUnitrefsVector(builder, it)
-            }
+            val units =
+                this.unitrefs
+                    ?.unitref
+                    ?.map {
+                        val unit = odx.units[it.idref] ?: error("Couldn't find unit $it")
+                        unit.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        UnitGroup.createUnitrefsVector(builder, it)
+                    }
 
             UnitGroup.startUnitGroup(builder)
             UnitGroup.addShortName(builder, shortName)
@@ -1870,19 +2147,24 @@ class DatabaseWriter(
 
     private fun UNITSPEC.offset(): Int =
         cachedObjects.getOrPut(this) {
-            val unitGroups = this.unitgroups?.unitgroup?.map { it.offset() }?.toIntArray()?.let {
-                UnitSpec.createUnitGroupsVector(builder, it)
-            }
+            val unitGroups =
+                this.unitgroups?.unitgroup?.map { it.offset() }?.toIntArray()?.let {
+                    UnitSpec.createUnitGroupsVector(builder, it)
+                }
             val physicalDimensions =
                 this.physicaldimensions?.physicaldimension?.map { it.offset() }?.toIntArray()?.let {
                     UnitSpec.createPhysicalDimensionsVector(builder, it)
                 }
-            val units = this.units?.unit?.map {
-                val unit = odx.units[it.id] ?: throw IllegalStateException("Unit ${it.id} not found")
-                unit.offset()
-            }?.toIntArray()?.let {
-                UnitSpec.createUnitsVector(builder, it)
-            }
+            val units =
+                this.units
+                    ?.unit
+                    ?.map {
+                        val unit = odx.units[it.id] ?: error("Unit ${it.id} not found")
+                        unit.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        UnitSpec.createUnitsVector(builder, it)
+                    }
             val sdgs = this.sdgs?.let { it.offset() }
 
             UnitSpec.startUnitSpec(builder)
@@ -1902,19 +2184,22 @@ class DatabaseWriter(
             val comParamUsage = this.cpusage?.toFileFormatEnum()
             val displayLevel = this.displaylevel?.toUInt()
 
-            val regularComParam = this.let {
-                val physicalDefaultValue = this.physicaldefaultvalue?.offset()
-                val dop = this.dataobjectpropref?.let {
-                    val dop = odx.combinedDataObjectProps[it.idref]
-                        ?: throw IllegalStateException("Couldn't find ${it.idref}")
-                    dop.offset()
-                }
+            val regularComParam =
+                this.let {
+                    val physicalDefaultValue = this.physicaldefaultvalue?.offset()
+                    val dop =
+                        this.dataobjectpropref?.let {
+                            val dop =
+                                odx.combinedDataObjectProps[it.idref]
+                                    ?: error("Couldn't find ${it.idref}")
+                            dop.offset()
+                        }
 
-                RegularComParam.startRegularComParam(builder)
-                physicalDefaultValue?.let { RegularComParam.addPhysicalDefaultValue(builder, it) }
-                dop?.let { RegularComParam.addDop(builder, it) }
-                RegularComParam.endRegularComParam(builder)
-            }
+                    RegularComParam.startRegularComParam(builder)
+                    physicalDefaultValue?.let { RegularComParam.addPhysicalDefaultValue(builder, it) }
+                    dop?.let { RegularComParam.addDop(builder, it) }
+                    RegularComParam.endRegularComParam(builder)
+                }
 
             ComParam.startComParam(builder)
             ComParam.addComParamType(builder, ComParamType.REGULAR)
@@ -1939,24 +2224,30 @@ class DatabaseWriter(
 
     private fun COMPLEXVALUE.offset(): Int =
         cachedObjects.getOrPut(this) {
-            val entries = this.simplevalueOrCOMPLEXVALUE?.map {
-                when (it) {
-                    is SIMPLEVALUE -> it.offset()
-                    is COMPLEXVALUE -> it.offset()
-                    else -> throw IllegalStateException("Unknown object type ${this.javaClass.simpleName}")
-                }
-            }?.toIntArray()?.let {
-                ComplexValue.createEntriesVector(builder, it)
-            }
-            val entriesTypes = this.simplevalueOrCOMPLEXVALUE?.map {
-                when (it) {
-                    is SIMPLEVALUE -> SimpleOrComplexValueEntry.SimpleValue
-                    is COMPLEXVALUE -> SimpleOrComplexValueEntry.ComplexValue
-                    else -> throw IllegalStateException("Unknown object type ${this.javaClass.simpleName}")
-                }
-            }?.toUByteArray()?.let {
-                ComplexValue.createEntriesTypeVector(builder, it)
-            }
+            val entries =
+                this.simplevalueOrCOMPLEXVALUE
+                    ?.map {
+                        when (it) {
+                            is SIMPLEVALUE -> it.offset()
+                            is COMPLEXVALUE -> it.offset()
+                            else -> error("Unknown object type ${this.javaClass.simpleName}")
+                        }
+                    }?.toIntArray()
+                    ?.let {
+                        ComplexValue.createEntriesVector(builder, it)
+                    }
+            val entriesTypes =
+                this.simplevalueOrCOMPLEXVALUE
+                    ?.map {
+                        when (it) {
+                            is SIMPLEVALUE -> SimpleOrComplexValueEntry.SimpleValue
+                            is COMPLEXVALUE -> SimpleOrComplexValueEntry.ComplexValue
+                            else -> error("Unknown object type ${this.javaClass.simpleName}")
+                        }
+                    }?.toUByteArray()
+                    ?.let {
+                        ComplexValue.createEntriesTypeVector(builder, it)
+                    }
             ComplexValue.startComplexValue(builder)
             entries?.let {
                 ComplexValue.addEntries(builder, it)
@@ -1973,29 +2264,38 @@ class DatabaseWriter(
             val comParamType = this.cptype?.toFileFormatEnum()
             val comParamUsage = this.cpusage?.toFileFormatEnum()
             val displayLevel = this.displaylevel?.toUInt()
-            val complexComParam = let {
-                val comParams = this.comparamOrCOMPLEXCOMPARAM?.map {
-                    when (it) {
-                        is COMPARAM -> it.offset()
-                        is COMPLEXCOMPARAM -> it.offset()
-                        else -> throw IllegalStateException("Unknown com param type ${it.id}")
-                    }
-                }?.toIntArray()?.let {
-                    ComplexComParam.createComParamsVector(builder, it)
-                }
+            val complexComParam =
+                let {
+                    val comParams =
+                        this.comparamOrCOMPLEXCOMPARAM
+                            ?.map {
+                                when (it) {
+                                    is COMPARAM -> it.offset()
+                                    is COMPLEXCOMPARAM -> it.offset()
+                                    else -> error("Unknown com param type ${it.id}")
+                                }
+                            }?.toIntArray()
+                            ?.let {
+                                ComplexComParam.createComParamsVector(builder, it)
+                            }
 
-                val complexPhysicalDefaultValues = this.complexphysicaldefaultvalue?.complexvalues?.complexvalue?.map {
-                    it.offset()
-                }?.toIntArray()?.let {
-                    ComplexComParam.createComplexPhysicalDefaultValuesVector(builder, it)
-                }
+                    val complexPhysicalDefaultValues =
+                        this.complexphysicaldefaultvalue
+                            ?.complexvalues
+                            ?.complexvalue
+                            ?.map {
+                                it.offset()
+                            }?.toIntArray()
+                            ?.let {
+                                ComplexComParam.createComplexPhysicalDefaultValuesVector(builder, it)
+                            }
 
-                ComplexComParam.startComplexComParam(builder)
-                comParams?.let { ComplexComParam.addComParams(builder, it) }
-                ComplexComParam.addAllowMultipleValues(builder, this.isALLOWMULTIPLEVALUES)
-                complexPhysicalDefaultValues?.let { ComplexComParam.addComplexPhysicalDefaultValues(builder, it) }
-                ComplexComParam.endComplexComParam(builder)
-            }
+                    ComplexComParam.startComplexComParam(builder)
+                    comParams?.let { ComplexComParam.addComParams(builder, it) }
+                    ComplexComParam.addAllowMultipleValues(builder, this.isALLOWMULTIPLEVALUES)
+                    complexPhysicalDefaultValues?.let { ComplexComParam.addComplexPhysicalDefaultValues(builder, it) }
+                    ComplexComParam.endComplexComParam(builder)
+                }
 
             ComParam.startComParam(builder)
             ComParam.addComParamType(builder, ComParamType.COMPLEX)
@@ -2045,18 +2345,22 @@ class DatabaseWriter(
     private fun PROTOCOL.offset(): Int =
         cachedObjects.getOrPut(this) {
             val diagLayer = (this as DIAGLAYER).offsetType()
-            val comparamSpecs = this.comparamspecref?.let {
-                val comParamSpec =
-                    odx.comparamSpecs[it.idref]
-                        ?: throw IllegalStateException("Couldn't find com param spec ${it.idref}")
-                comParamSpec.offset()
-            }
-            val protStack = this.protstacksnref?.let { protStack ->
-                val stack = odx.comparamSpecs.values.flatMap { it.protstacks?.protstack ?: emptyList() }
-                    .firstOrNull { it.shortname == protStack.shortname }
-                    ?: throw IllegalStateException("Couldn't find protstack with short name ${protStack.shortname}")
-                stack.offset()
-            }
+            val comparamSpecs =
+                this.comparamspecref?.let {
+                    val comParamSpec =
+                        odx.comparamSpecs[it.idref]
+                            ?: error("Couldn't find com param spec ${it.idref}")
+                    comParamSpec.offset()
+                }
+            val protStack =
+                this.protstacksnref?.let { protStack ->
+                    val stack =
+                        odx.comparamSpecs.values
+                            .flatMap { it.protstacks?.protstack ?: emptyList() }
+                            .firstOrNull { it.shortname == protStack.shortname }
+                            ?: error("Couldn't find protstack with short name ${protStack.shortname}")
+                    stack.offset()
+                }
             if (this.parentrefs != null) {
                 TODO("Prot stack parent refs not supported")
             }
@@ -2070,11 +2374,15 @@ class DatabaseWriter(
 
     private fun COMPARAMSPEC.offset(): Int =
         cachedObjects.getOrPut(this) {
-            val protStacks = this.protstacks?.protstack?.map {
-                it.offset()
-            }?.toIntArray()?.let {
-                ComParamSpec.createProtStacksVector(builder, it)
-            }
+            val protStacks =
+                this.protstacks
+                    ?.protstack
+                    ?.map {
+                        it.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        ComParamSpec.createProtStacksVector(builder, it)
+                    }
             ComParamSpec.startComParamSpec(builder)
             protStacks?.let { ComParamSpec.addProtStacks(builder, it) }
             ComParamSpec.endComParamSpec(builder)
@@ -2084,13 +2392,18 @@ class DatabaseWriter(
         cachedObjects.getOrPut(this) {
             val shortName = this.shortname.offset()
             val longName = this.longname?.offset()
-            val comparamSubSets = this.comparamsubsetrefs?.comparamsubsetref?.map {
-                val comparamSubSet = odx.comParamSubSets[it.idref]
-                    ?: throw IllegalStateException("Couldn't find com param subset ${it.idref}")
-                comparamSubSet.offset()
-            }?.toIntArray()?.let {
-                ProtStack.createComparamSubsetRefsVector(builder, it)
-            }
+            val comparamSubSets =
+                this.comparamsubsetrefs
+                    ?.comparamsubsetref
+                    ?.map {
+                        val comparamSubSet =
+                            odx.comParamSubSets[it.idref]
+                                ?: error("Couldn't find com param subset ${it.idref}")
+                        comparamSubSet.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        ProtStack.createComparamSubsetRefsVector(builder, it)
+                    }
             val physicalLinkType = this.physicallinktype?.offset()
             val pduProtocolType = this.pduprotocoltype?.offset()
 
@@ -2105,12 +2418,13 @@ class DatabaseWriter(
 
     private fun COMPARAMREF.offset(): Int =
         cachedObjects.getOrPut(this) {
-            val comParam = odx.comparams[this.idref]?.offset()
-                ?: odx.complexComparams[this.idref]?.offset()
+            val comParam =
+                odx.comparams[this.idref]?.offset()
+                    ?: odx.complexComparams[this.idref]?.offset()
 
             if (comParam == null) {
                 if (!options.lenient) {
-                    throw IllegalStateException("Couldn't find COMPARAM ${this.idref} @ ${this.docref}")
+                    error("Couldn't find COMPARAM ${this.idref} @ ${this.docref}")
                 }
                 logger.warning("Couldn't find COMPARAM ${this.idref} @ ${this.docref}")
             }
@@ -2118,18 +2432,22 @@ class DatabaseWriter(
             val simpleValue = this.simplevalue?.offset()
             val complexValue = this.complexvalue?.offset()
 
-            val protocol = this.protocolsnref?.shortname?.let { shortName ->
-                val protocolOdx = odx.protocols.values.firstOrNull { it.shortname == shortName }
-                    ?: throw IllegalStateException("Couldn't find PROTOCOL $shortName")
-                protocolOdx.offset()
-            }
+            val protocol =
+                this.protocolsnref?.shortname?.let { shortName ->
+                    val protocolOdx =
+                        odx.protocols.values.firstOrNull { it.shortname == shortName }
+                            ?: error("Couldn't find PROTOCOL $shortName")
+                    protocolOdx.offset()
+                }
 
-            val protStack = this.protstacksnref?.let {
-                val protStackOdx = odx.protStacks.values.firstOrNull { it.shortname == this.protstacksnref.shortname }
-                    ?: throw IllegalStateException("Can't find protocol ${this.protstacksnref.shortname}")
+            val protStack =
+                this.protstacksnref?.let {
+                    val protStackOdx =
+                        odx.protStacks.values.firstOrNull { it.shortname == this.protstacksnref.shortname }
+                            ?: error("Can't find protocol ${this.protstacksnref.shortname}")
 
-                protStackOdx.offset()
-            }
+                    protStackOdx.offset()
+                }
 
             ComParamRef.startComParamRef(builder)
             comParam?.let { ComParamRef.addComParam(builder, it) }
@@ -2144,16 +2462,18 @@ class DatabaseWriter(
         cachedObjects.getOrPut(this) {
             val shortName = this.shortname.offset()
             val semantic = this.semantic.offset()
-            val stateTransitions = this.statetransitions?.statetransition?.let { transitions ->
-                val data = transitions.map { it.offset() }.toIntArray()
-                StateChart.createStateTransitionsVector(builder, data)
-            }
+            val stateTransitions =
+                this.statetransitions?.statetransition?.let { transitions ->
+                    val data = transitions.map { it.offset() }.toIntArray()
+                    StateChart.createStateTransitionsVector(builder, data)
+                }
             val startStateShortName = this.startstatesnref.shortname.offset()
 
-            val states = this.states?.state?.let { states ->
-                val data = states.map { it.offset() }.toIntArray()
-                StateChart.createStatesVector(builder, data)
-            }
+            val states =
+                this.states?.state?.let { states ->
+                    val data = states.map { it.offset() }.toIntArray()
+                    StateChart.createStatesVector(builder, data)
+                }
 
             StateChart.startStateChart(builder)
             StateChart.addShortName(builder, shortName)
@@ -2182,8 +2502,9 @@ class DatabaseWriter(
 
     private fun SWITCHKEY.offset(): Int =
         cachedObjects.getOrPut(this) {
-            val dop = odx.combinedDataObjectProps[this.dataobjectpropref.idref]?.offset()
-                ?: throw IllegalStateException("Couldn't find dop-ref ${this.dataobjectpropref.idref}")
+            val dop =
+                odx.combinedDataObjectProps[this.dataobjectpropref.idref]?.offset()
+                    ?: error("Couldn't find dop-ref ${this.dataobjectpropref.idref}")
 
             SwitchKey.startSwitchKey(builder)
             SwitchKey.addBytePosition(builder, this.byteposition.toUInt())
@@ -2196,11 +2517,13 @@ class DatabaseWriter(
         cachedObjects.getOrPut(this) {
             val shortName = this.shortname.offset()
             val longName = this.longname?.offset()
-            val structure = this.structureref?.let {
-                val dop = odx.combinedDataObjectProps[it.idref]
-                    ?: throw IllegalStateException("Couldn't find dop-structure-ref ${this.structureref.idref}")
-                dop.offset()
-            }
+            val structure =
+                this.structureref?.let {
+                    val dop =
+                        odx.combinedDataObjectProps[it.idref]
+                            ?: error("Couldn't find dop-structure-ref ${this.structureref.idref}")
+                    dop.offset()
+                }
 
             DefaultCase.startDefaultCase(builder)
             DefaultCase.addShortName(builder, shortName)
@@ -2219,8 +2542,9 @@ class DatabaseWriter(
             this.structuresnref?.shortname?.let {
                 TODO("STRUCTURE shortnameref not supported for $this")
             }
-            val structure = odx.combinedDataObjectProps[this.structureref.idref]?.offset()
-                ?: throw IllegalStateException("Couldn't find dop-structure-ref ${this.structureref.idref}")
+            val structure =
+                odx.combinedDataObjectProps[this.structureref.idref]?.offset()
+                    ?: error("Couldn't find dop-structure-ref ${this.structureref.idref}")
 
             Case.startCase(builder)
             Case.addShortName(builder, shortName)
@@ -2241,38 +2565,53 @@ class DatabaseWriter(
             this.dataobjectpropsnref?.let {
                 error("Unsupported data object prop shortname ref ${this.structuresnref}")
             }
-            val dop = this.dataobjectpropref?.idref?.let {
-                val dop = odx.combinedDataObjectProps[it] ?: throw IllegalStateException("Couldn't find dop $it")
-                dop.offset()
-            }
+            val dop =
+                this.dataobjectpropref?.idref?.let {
+                    val dop = odx.combinedDataObjectProps[it] ?: error("Couldn't find dop $it")
+                    dop.offset()
+                }
             this.structuresnref?.let {
                 error("Unsupported structure shortname ref ${this.structuresnref}")
             }
-            val structure = this.structureref?.idref?.let {
-                val structureDop = odx.structures[it] ?: throw IllegalStateException("Couldn't find structure $it")
-                structureDop.offset()
-            }
+            val structure =
+                this.structureref?.idref?.let {
+                    val structureDop = odx.structures[it] ?: error("Couldn't find structure $it")
+                    structureDop.offset()
+                }
             val sdgs = this.sdgs?.offset()
             val audience = this.audience?.offset()
-            val functClasses = this.functclassrefs?.functclassref?.map {
-                val functClass =
-                    odx.functClasses[it.idref] ?: throw IllegalStateException("Couldn't find funct class ${it.idref}")
-                functClass.offset()
-            }?.toIntArray()?.let {
-                TableRow.createFunctClassRefsVector(builder, it)
-            }
+            val functClasses =
+                this.functclassrefs
+                    ?.functclassref
+                    ?.map {
+                        val functClass =
+                            odx.functClasses[it.idref]
+                                ?: error("Couldn't find funct class ${it.idref}")
+                        functClass.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        TableRow.createFunctClassRefsVector(builder, it)
+                    }
 
-            val stateTransitionsRefs = this.statetransitionrefs?.statetransitionref?.map {
-                it.offset()
-            }?.toIntArray()?.let {
-                TableRow.createStateTransitionRefsVector(builder, it)
-            }
+            val stateTransitionsRefs =
+                this.statetransitionrefs
+                    ?.statetransitionref
+                    ?.map {
+                        it.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        TableRow.createStateTransitionRefsVector(builder, it)
+                    }
 
-            val preconditionStateRefs = this.preconditionstaterefs?.preconditionstateref?.map {
-                it.offset()
-            }?.toIntArray()?.let {
-                TableRow.createPreConditionStateRefsVector(builder, it)
-            }
+            val preconditionStateRefs =
+                this.preconditionstaterefs
+                    ?.preconditionstateref
+                    ?.map {
+                        it.offset()
+                    }?.toIntArray()
+                    ?.let {
+                        TableRow.createPreConditionStateRefsVector(builder, it)
+                    }
 
             TableRow.startTableRow(builder)
             TableRow.addShortName(builder, shortName)
@@ -2297,7 +2636,5 @@ class DatabaseWriter(
             builder.createString(this)
         }
 
-    private fun ByteArray.offset(): Int =
-        builder.createByteVector(this)
-
+    private fun ByteArray.offset(): Int = builder.createByteVector(this)
 }

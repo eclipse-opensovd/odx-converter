@@ -20,23 +20,18 @@ import org.apache.commons.compress.compressors.lzma.LZMACompressorOutputStream
 import org.eclipse.opensovd.cda.mdd.Signature
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
-import java.util.logging.Logger
 
 /**
  * Default compression plugin, compresses chunks with LZMA, and adds a sha512 hash of the initial (uncompressed) data.
  */
 class CompressionPlugin : ConverterPlugin {
-    override fun getPluginIdentifier(): String =
-        "compression"
+    override fun getPluginIdentifier(): String = "compression"
 
-    override fun getPluginVersion(): String =
-        "0.1.0"
+    override fun getPluginVersion(): String = "0.1.0"
 
-    override fun getPluginDescription(): String =
-        "Default plugin to compress chunks with lzma"
+    override fun getPluginDescription(): String = "Default plugin to compress chunks with lzma"
 
-    override fun getPluginPriority(): Int =
-        50
+    override fun getPluginPriority(): Int = 50
 
     override fun beforeProcessing(api: ConverterApi) {
         // No implementation, since plugin doesn't require pre-processing
@@ -45,7 +40,7 @@ class CompressionPlugin : ConverterPlugin {
     override fun processChunk(
         api: ConverterApi,
         initialData: ByteArray,
-        chunkApi: ChunkApi
+        chunkApi: ChunkApi,
     ) {
         val data = chunkApi.chunk.data?.toByteArray() ?: initialData
 
@@ -63,9 +58,11 @@ class CompressionPlugin : ConverterPlugin {
         api.logger.finest("Calculating SHA-512 for chunk")
         val md = MessageDigest.getInstance("SHA-512")
         val uncompressedDigest = md.digest(data)
-        val signature = Signature.newBuilder()
-            .setAlgorithm("sha512_uncompressed")
-            .setSignature(ByteString.copyFrom(uncompressedDigest))
+        val signature =
+            Signature
+                .newBuilder()
+                .setAlgorithm("sha512_uncompressed")
+                .setSignature(ByteString.copyFrom(uncompressedDigest))
         chunkApi.chunk.addSignatures(signature)
     }
 

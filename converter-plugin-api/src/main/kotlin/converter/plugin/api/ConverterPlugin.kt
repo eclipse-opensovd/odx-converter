@@ -47,7 +47,11 @@ interface ConverterPlugin {
     /**
      * Called for every chunk that has been created within the odx-converter itself
      */
-    fun processChunk(api: ConverterApi, initialData: ByteArray, chunkApi: ChunkApi)
+    fun processChunk(
+        api: ConverterApi,
+        initialData: ByteArray,
+        chunkApi: ChunkApi,
+    )
 
     /**
      * Called after default chunks have been created, before the output file is created

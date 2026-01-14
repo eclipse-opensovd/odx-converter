@@ -102,9 +102,13 @@ fun determineCommitHash(): String? {
     }
     // when built locally, try to use git as a fallback to determine the hash
     try {
-        val data = providers.exec {
-            commandLine("git", "rev-parse", "HEAD")
-        }.standardOutput.asText.get().trim()
+        val data =
+            providers
+                .exec {
+                    commandLine("git", "rev-parse", "HEAD")
+                }.standardOutput.asText
+                .get()
+                .trim()
         return data
     } catch (_: Exception) {
         return null
