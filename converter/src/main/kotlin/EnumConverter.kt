@@ -24,7 +24,36 @@ import dataformat.Radix
 import dataformat.TableEntryRowFragment
 import dataformat.Termination
 import dataformat.TransmissionMode
-import schema.odx.*
+import schema.odx.ADDRESSING
+import schema.odx.CODEDCONST
+import schema.odx.COMPUCATEGORY
+import schema.odx.DATATYPE
+import schema.odx.DIAGCLASSTYPE
+import schema.odx.DIAGCODEDTYPE
+import schema.odx.DYNAMIC
+import schema.odx.INTERVALTYPE
+import schema.odx.LEADINGLENGTHINFOTYPE
+import schema.odx.LENGTHKEY
+import schema.odx.MATCHINGREQUESTPARAM
+import schema.odx.MINMAXLENGTHTYPE
+import schema.odx.NRCCONST
+import schema.odx.PARAM
+import schema.odx.PARAMLENGTHINFOTYPE
+import schema.odx.PHYSCONST
+import schema.odx.PHYSICALDATATYPE
+import schema.odx.RADIX
+import schema.odx.RESERVED
+import schema.odx.ROWFRAGMENT
+import schema.odx.STANDARDISATIONLEVEL
+import schema.odx.STANDARDLENGTHTYPE
+import schema.odx.SYSTEM
+import schema.odx.TABLEENTRY
+import schema.odx.TABLEKEY
+import schema.odx.TABLESTRUCT
+import schema.odx.TERMINATION
+import schema.odx.TRANSMODE
+import schema.odx.USAGE
+import schema.odx.VALUE
 
 fun TRANSMODE.toFileFormatEnum(): Byte =
     when (this) {
@@ -147,7 +176,7 @@ fun PARAM.toParamTypeEnum(): Byte =
         is TABLEKEY -> ParamType.TABLE_KEY
         is TABLESTRUCT -> ParamType.TABLE_STRUCT
         is VALUE -> ParamType.VALUE
-        else -> throw IllegalStateException("Unknown param type ${this::class.java.simpleName}")
+        else -> error("Unknown param type ${this::class.java.simpleName}")
     }
 
 /**
@@ -160,5 +189,5 @@ fun DIAGCODEDTYPE.toTypeEnum(): Byte =
         is MINMAXLENGTHTYPE -> DiagCodedTypeName.MIN_MAX_LENGTH_TYPE
         is PARAMLENGTHINFOTYPE -> DiagCodedTypeName.PARAM_LENGTH_INFO_TYPE
         is STANDARDLENGTHTYPE -> DiagCodedTypeName.STANDARD_LENGTH_TYPE
-        else -> throw IllegalStateException("Unknown diag coded type ${this::class.java.simpleName}")
+        else -> error("Unknown diag coded type ${this::class.java.simpleName}")
     }

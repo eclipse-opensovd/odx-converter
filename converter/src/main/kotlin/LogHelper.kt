@@ -16,13 +16,22 @@ import java.io.FileOutputStream
 import java.time.ZoneOffset.UTC
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
-import java.util.logging.*
+import java.util.logging.Formatter
+import java.util.logging.Level
+import java.util.logging.LogRecord
+import java.util.logging.Logger
+import java.util.logging.StreamHandler
 
-fun Logger.severe(msg: String, e: Throwable? = null) =
-    this.log(Level.SEVERE, msg, e)
+fun Logger.severe(
+    msg: String,
+    e: Throwable? = null,
+) = this.log(Level.SEVERE, msg, e)
 
-
-class WriteToFileHandler(level: Level, file: File): StreamHandler(FileOutputStream(file), FileFormatter()), AutoCloseable {
+class WriteToFileHandler(
+    level: Level,
+    file: File,
+) : StreamHandler(FileOutputStream(file), FileFormatter()),
+    AutoCloseable {
     init {
         setLevel(level)
     }
@@ -30,9 +39,10 @@ class WriteToFileHandler(level: Level, file: File): StreamHandler(FileOutputStre
 
 class FileFormatter : Formatter() {
     private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS'Z'")
+
     override fun format(record: LogRecord): String {
         val dateTime = ZonedDateTime.now(UTC).format(formatter)
-        val sb = StringBuilder("[${dateTime}] [${record.level.name.padEnd(7)}] ${formatMessage(record)}")
+        val sb = StringBuilder("[$dateTime] [${record.level.name.padEnd(7)}] ${formatMessage(record)}")
         record.thrown?.let {
             sb.append(":\n")
             sb.append(it.stackTraceToString())

@@ -19,7 +19,8 @@ import converter.plugin.api.ConverterPluginProvider
  * Provides the default plugins
  */
 class DefaultPluginsProvider : ConverterPluginProvider {
-    override fun getPlugins(): List<ConverterPlugin> = listOf(
-        CompressionPlugin(),
-    )
+    override fun getPlugins(): List<ConverterPlugin> =
+        listOf(
+            CompressionPlugin(),
+        )
 }

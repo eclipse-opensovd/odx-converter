@@ -20,6 +20,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     kotlin("jvm") version libs.versions.kotlin
     id("com.github.jk1.dependency-license-report") version "2.9"
+    id("org.jlleitschuh.gradle.ktlint") version "14.0.1"
 }
 
 group = "org.eclipse.opensovd.cda.mdd"
@@ -34,6 +35,13 @@ allprojects {
     repositories {
         mavenCentral()
         gradlePluginPortal()
+    }
+    plugins.apply("org.jlleitschuh.gradle.ktlint")
+}
+
+ktlint {
+    filter {
+        exclude("**/dataformat/**")
     }
 }
 

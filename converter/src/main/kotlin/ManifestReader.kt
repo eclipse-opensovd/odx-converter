@@ -24,14 +24,15 @@ object ManifestReader {
     val commitHash: String
         get() = attributes?.getValue("Implementation-Commit") ?: "unknown"
 
-    private val attributes = javaClass.protectionDomain?.codeSource?.location?.let { loc ->
-        val f = File(loc.toURI())
-        if (f.isFile) {
-            JarFile(f).use { jf ->
-                jf.manifest?.mainAttributes
+    private val attributes =
+        javaClass.protectionDomain?.codeSource?.location?.let { loc ->
+            val f = File(loc.toURI())
+            if (f.isFile) {
+                JarFile(f).use { jf ->
+                    jf.manifest?.mainAttributes
+                }
+            } else {
+                null
             }
-        } else {
-            null
         }
-    }
 }

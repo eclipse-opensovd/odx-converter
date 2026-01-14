@@ -16,7 +16,11 @@ import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.help
 import com.github.ajalt.clikt.parameters.arguments.multiple
-import com.github.ajalt.clikt.parameters.options.*
+import com.github.ajalt.clikt.parameters.options.flag
+import com.github.ajalt.clikt.parameters.options.help
+import com.github.ajalt.clikt.parameters.options.multiple
+import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.options.pair
 import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.file
 import converter.plugin.api.ConverterApi
@@ -33,7 +37,7 @@ import java.io.BufferedOutputStream
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.time.Instant
-import java.util.*
+import java.util.ServiceLoader
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.logging.Level
@@ -70,9 +74,10 @@ class FileConverter(
     ): ChunkStat? {
         val initialData = chunk.data.toByteArray()
 
-        val pluginsAsText = plugins.joinToString(", ") {
-            it.getPluginIdentifier()
-        }
+        val pluginsAsText =
+            plugins.joinToString(", ") {
+                it.getPluginIdentifier()
+            }
         logger.fine("Chunk '${chunk.name}' (${chunk.type}) to be processed by plugins: $pluginsAsText")
 
         plugins.forEach { plugin ->
@@ -80,9 +85,13 @@ class FileConverter(
             logger.fine("Chunk '${chunk.name}' (${chunk.type}) to be processed by plugin '${plugin.getPluginIdentifier()}'")
             val handler = ChunkApiHandler(chunk)
             plugin.processChunk(pluginHandler, initialData, handler)
-            logger.fine("Chunk '${chunk.name}' (${chunk.type}) was processed by plugin '${plugin.getPluginIdentifier()}': $sizeBefore bytes -> ${chunk.data.size()} bytes")
+            logger.fine(
+                "Chunk '${chunk.name}' (${chunk.type}) was processed by plugin '${plugin.getPluginIdentifier()}': $sizeBefore bytes -> ${chunk.data.size()} bytes",
+            )
             if (handler.removeChunk) {
-                logger.info("Chunk '${chunk.name}' (${chunk.type}) was removed by plugin '${plugin.getPluginIdentifier()}', processing aborted")
+                logger.info(
+                    "Chunk '${chunk.name}' (${chunk.type}) was removed by plugin '${plugin.getPluginIdentifier()}', processing aborted",
+                )
                 return null
             }
         }
@@ -97,7 +106,9 @@ class FileConverter(
         stats.add(stat)
 
         mddFile.addChunks(chunk)
-        logger.info("Chunk '${chunk.name}' (${chunk.type}) was added to the file with ${stat.compressedSize?.format()} bytes of data, initial size: ${stat.uncompressedSize.format()} bytes")
+        logger.info(
+            "Chunk '${chunk.name}' (${chunk.type}) was added to the file with ${stat.compressedSize?.format()} bytes of data, initial size: ${stat.uncompressedSize.format()} bytes",
+        )
         return stat
     }
 
@@ -115,7 +126,6 @@ class FileConverter(
 
         val readParseFileDuration =
             measureTime {
-
                 readOdxFromZip(inputFile, odxData, inputFileData)
             }
         logger.fine("Reading and parsing into objects took $readParseFileDuration")
@@ -140,10 +150,11 @@ class FileConverter(
                 mddFile.putMetadata("options", Json.encodeToString(options))
                 // additional metadata?
 
-                val pluginHandler = PluginApiHandler(mddFile, logger) { chunk, pluginApiHandler ->
-                    logger.info("Chunk '${chunk.name}' (${chunk.type}) was added by a plugin")
-                    handleAndAddChunk(chunk, plugins, pluginApiHandler, stats, mddFile)
-                }
+                val pluginHandler =
+                    PluginApiHandler(mddFile, logger) { chunk, pluginApiHandler ->
+                        logger.info("Chunk '${chunk.name}' (${chunk.type}) was added by a plugin")
+                        handleAndAddChunk(chunk, plugins, pluginApiHandler, stats, mddFile)
+                    }
 
                 plugins.forEach { plugin ->
                     plugin.beforeProcessing(pluginHandler)
@@ -180,7 +191,7 @@ class FileConverter(
 
         val sizeCompressed = outputFile.toPath().fileSize()
         logger.info(
-            "Writing database took $writingDuration total (compression: $compressionDuration) - sizes: odx raw: ${odxRawSize.format()} bytes, uncompressed chunks: ${sizeUncompressed.format()} bytes, compressed mdd: ${sizeCompressed.format()} bytes"
+            "Writing database took $writingDuration total (compression: $compressionDuration) - sizes: odx raw: ${odxRawSize.format()} bytes, uncompressed chunks: ${sizeUncompressed.format()} bytes, compressed mdd: ${sizeCompressed.format()} bytes",
         )
     }
 
@@ -204,17 +215,19 @@ class FileConverter(
 
         var hadParseErrors = false
         // Output ODX validation errors to log file
-        unmarshaller.eventHandler = ValidationEventHandler { event ->
-            val level = when (event.severity)  {
-                ValidationEvent.FATAL_ERROR -> Level.SEVERE
-                ValidationEvent.ERROR -> Level.SEVERE
-                ValidationEvent.WARNING -> Level.WARNING
-                else -> Level.INFO
+        unmarshaller.eventHandler =
+            ValidationEventHandler { event ->
+                val level =
+                    when (event.severity) {
+                        ValidationEvent.FATAL_ERROR -> Level.SEVERE
+                        ValidationEvent.ERROR -> Level.SEVERE
+                        ValidationEvent.WARNING -> Level.WARNING
+                        else -> Level.INFO
+                    }
+                logger.log(level, "ODX error: ${event.locator} ${event.message}")
+                hadParseErrors = true
+                true // keep going
             }
-            logger.log(level, "ODX error: ${event.locator} ${event.message}")
-            hadParseErrors = true
-            true  // keep going
-        }
 
         inputFileData.forEach { entry ->
             if (!entry.key.contains(".odx")) {
@@ -264,11 +277,13 @@ class Converter : CliktCommand(name = "odx-converter") {
 
     val logLevel: Level? by option("--log-level")
         .help("Sets the log level for the .mdd.log files")
-        .choice(mapOf(
-            "info" to Level.INFO,
-            "debug" to Level.FINE,
-            "trace" to Level.FINEST,
-        ))
+        .choice(
+            mapOf(
+                "info" to Level.INFO,
+                "debug" to Level.FINE,
+                "trace" to Level.FINEST,
+            ),
+        )
 
     private var hadErrors: Boolean = false
     private val context: JAXBContext =
