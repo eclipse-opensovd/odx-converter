@@ -13,7 +13,6 @@
 
 import com.google.protobuf.ByteString
 import org.eclipse.opensovd.cda.mdd.Chunk
-import java.io.ByteArrayInputStream
 import java.util.logging.Logger
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
@@ -21,7 +20,7 @@ import java.util.zip.ZipInputStream
 class ChunkBuilder {
     fun createJobsChunks(
         logger: Logger,
-        inputData: Map<String, ByteArray>,
+        inputData: Map<String, ZipEntryInfos>,
         odx: ODXCollection,
         options: ConverterOptions,
     ): List<Chunk.Builder> {
@@ -45,14 +44,14 @@ class ChunkBuilder {
                 .newBuilder()
                 .setName(fileName)
                 .setType(Chunk.DataType.CODE_FILE)
-                .setUncompressedSize(data.size.toLong())
-                .setData(ByteString.copyFrom(data))
+                .setUncompressedSize(data.size)
+                .setData(ByteString.copyFrom(data.inputStream.invoke().use { it.readAllBytes() }))
         }
     }
 
     fun createPartialChunks(
         logger: Logger,
-        inputData: Map<String, ByteArray>,
+        inputData: Map<String, ZipEntryInfos>,
         odx: ODXCollection,
         options: ConverterOptions,
     ): List<Chunk.Builder> {
@@ -84,7 +83,7 @@ class ChunkBuilder {
                     val data =
                         inputData[it.key] ?: error("File $jobFileName is not included in PDX")
                     if (it.key.endsWith(".jar", ignoreCase = true) || it.key.endsWith(".zip", ignoreCase = true)) {
-                        ZipInputStream(ByteArrayInputStream(data)).use { zip ->
+                        ZipInputStream(data.inputStream.invoke()).use { zip ->
                             val matches =
                                 extractMatchingFilesFromZip(
                                     logger,
