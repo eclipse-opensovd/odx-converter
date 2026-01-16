@@ -69,7 +69,7 @@ import schema.odx.UNITSPEC
 
 class ODXCollection(
     val data: Map<String, ODX>,
-    val rawSize: Int,
+    val rawSize: Long,
 ) {
     val ecuName: String by lazy {
         val ecuName =

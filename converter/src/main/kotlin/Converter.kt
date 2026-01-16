@@ -34,8 +34,8 @@ import org.eclipse.opensovd.cda.mdd.Chunk
 import org.eclipse.opensovd.cda.mdd.MDDFile
 import schema.odx.ODX
 import java.io.BufferedOutputStream
-import java.io.ByteArrayInputStream
 import java.io.File
+import java.io.InputStream
 import java.time.Instant
 import java.util.ServiceLoader
 import java.util.concurrent.Executors
@@ -48,6 +48,11 @@ import kotlin.io.path.fileSize
 import kotlin.system.exitProcess
 import kotlin.time.Duration
 import kotlin.time.measureTime
+
+class ZipEntryInfos(
+    val size: Long,
+    val inputStream: () -> InputStream,
+)
 
 class FileConverter(
     private val logger: Logger,
@@ -122,93 +127,94 @@ class FileConverter(
 
         val odxData = mutableMapOf<String, ODX>()
 
-        val inputFileData = mutableMapOf<String, ByteArray>()
+        val inputFileData = mutableMapOf<String, ZipEntryInfos>()
 
-        val readParseFileDuration =
-            measureTime {
-                readOdxFromZip(inputFile, odxData, inputFileData)
-            }
-        logger.fine("Reading and parsing into objects took $readParseFileDuration")
+        ZipFile(inputFile).use { zipFile ->
+            val readParseFileDuration =
+                measureTime {
+                    fillInputFileData(zipFile, odxData, inputFileData)
+                }
+            logger.fine("Reading and parsing into objects took $readParseFileDuration")
 
-        val odxRawSize = inputFileData.filter { it.key.contains(".odx") }.map { it.value.size }.sum()
+            val odxRawSize = inputFileData.filter { it.key.contains(".odx") }.map { it.value.size }.sum()
 
-        val odxCollection = ODXCollection(odxData, odxRawSize)
+            val odxCollection = ODXCollection(odxData, odxRawSize)
 
-        var compressionDuration: Duration = Duration.ZERO
-        val plugins = retrievePlugins()
+            var compressionDuration: Duration = Duration.ZERO
+            val plugins = retrievePlugins()
 
-        var sizeUncompressed: Long = 0
-        val writingDuration =
-            measureTime {
-                val mddFile = MDDFile.newBuilder()
-                mddFile.version = "2025-05-21"
-                mddFile.ecuName = odxCollection.ecuName
-                mddFile.revision = odxCollection.odxRevision
+            var sizeUncompressed: Long = 0
+            val writingDuration =
+                measureTime {
+                    val mddFile = MDDFile.newBuilder()
+                    mddFile.version = "2025-05-21"
+                    mddFile.ecuName = odxCollection.ecuName
+                    mddFile.revision = odxCollection.odxRevision
 
-                mddFile.putMetadata("created", getCurrentTimeReproducible().toString())
-                mddFile.putMetadata("source", inputFile.name)
-                mddFile.putMetadata("options", Json.encodeToString(options))
-                // additional metadata?
+                    mddFile.putMetadata("created", getCurrentTimeReproducible().toString())
+                    mddFile.putMetadata("source", inputFile.name)
+                    mddFile.putMetadata("options", Json.encodeToString(options))
+                    // additional metadata?
 
-                val pluginHandler =
-                    PluginApiHandler(mddFile, logger) { chunk, pluginApiHandler ->
-                        logger.info("Chunk '${chunk.name}' (${chunk.type}) was added by a plugin")
-                        handleAndAddChunk(chunk, plugins, pluginApiHandler, stats, mddFile)
+                    val pluginHandler =
+                        PluginApiHandler(mddFile, logger) { chunk, pluginApiHandler ->
+                            logger.info("Chunk '${chunk.name}' (${chunk.type}) was added by a plugin")
+                            handleAndAddChunk(chunk, plugins, pluginApiHandler, stats, mddFile)
+                        }
+
+                    plugins.forEach { plugin ->
+                        plugin.beforeProcessing(pluginHandler)
                     }
 
-                plugins.forEach { plugin ->
-                    plugin.beforeProcessing(pluginHandler)
-                }
-
-                val chunkBuilder = ChunkBuilder()
-                compressionDuration =
-                    measureTime {
-                        val chunk = chunkBuilder.createEcuDataChunk(logger, odxCollection, options)
-                        val stat = handleAndAddChunk(chunk, plugins, pluginHandler, stats, mddFile)
-                        stat?.rawSize = odxCollection.rawSize.toLong()
+                    val chunkBuilder = ChunkBuilder()
+                    compressionDuration =
+                        measureTime {
+                            val chunk = chunkBuilder.createEcuDataChunk(logger, odxCollection, options)
+                            val stat = handleAndAddChunk(chunk, plugins, pluginHandler, stats, mddFile)
+                            stat?.rawSize = odxCollection.rawSize
+                        }
+                    val jobChunks = chunkBuilder.createJobsChunks(logger, inputFileData, odxCollection, options)
+                    jobChunks.forEach { chunk ->
+                        handleAndAddChunk(chunk, plugins, pluginHandler, stats, mddFile)
                     }
-                val jobChunks = chunkBuilder.createJobsChunks(logger, inputFileData, odxCollection, options)
-                jobChunks.forEach { chunk ->
-                    handleAndAddChunk(chunk, plugins, pluginHandler, stats, mddFile)
-                }
-                val partialChunks = chunkBuilder.createPartialChunks(logger, inputFileData, odxCollection, options)
-                partialChunks.forEach { chunk ->
-                    handleAndAddChunk(chunk, plugins, pluginHandler, stats, mddFile)
+                    val partialChunks = chunkBuilder.createPartialChunks(logger, inputFileData, odxCollection, options)
+                    partialChunks.forEach { chunk ->
+                        handleAndAddChunk(chunk, plugins, pluginHandler, stats, mddFile)
+                    }
+
+                    plugins.forEach { plugin ->
+                        plugin.afterProcessing(pluginHandler)
+                    }
+
+                    sizeUncompressed = mddFile.chunksList.sumOf { it.uncompressedSize }
+
+                    val mddFileOut = mddFile.build()
+                    BufferedOutputStream(outputFile.outputStream()).use {
+                        it.write(FILE_MAGIC)
+                        mddFileOut.writeTo(it)
+                    }
                 }
 
-                plugins.forEach { plugin ->
-                    plugin.afterProcessing(pluginHandler)
-                }
-
-                sizeUncompressed = mddFile.chunksList.sumOf { it.uncompressedSize }
-
-                val mddFileOut = mddFile.build()
-                BufferedOutputStream(outputFile.outputStream()).use {
-                    it.write(FILE_MAGIC)
-                    mddFileOut.writeTo(it)
-                }
-            }
-
-        val sizeCompressed = outputFile.toPath().fileSize()
-        logger.info(
-            "Writing database took $writingDuration total (compression: $compressionDuration) - sizes: odx raw: ${odxRawSize.format()} bytes, uncompressed chunks: ${sizeUncompressed.format()} bytes, compressed mdd: ${sizeCompressed.format()} bytes",
-        )
+            val sizeCompressed = outputFile.toPath().fileSize()
+            logger.info(
+                "Writing database took $writingDuration total (compression: $compressionDuration) - sizes: odx raw: ${odxRawSize.format()} bytes, uncompressed chunks: ${sizeUncompressed.format()} bytes, compressed mdd: ${sizeCompressed.format()} bytes",
+            )
+        }
     }
 
-    private fun readOdxFromZip(
-        zipFile: File,
+    private fun fillInputFileData(
+        zipFile: ZipFile,
         odxData: MutableMap<String, ODX>,
-        inputFileData: MutableMap<String, ByteArray>,
+        inputFileData: MutableMap<String, ZipEntryInfos>,
     ) {
-        ZipFile(zipFile).use { zip ->
-            zip.entries().toList().forEach { entry ->
-                if (entry.isDirectory) {
-                    return@forEach
-                }
-                zip.getInputStream(entry).use { input ->
-                    inputFileData[entry.name] = input.readBytes()
-                }
+        zipFile.entries().toList().forEach { entry ->
+            if (entry.isDirectory) {
+                return@forEach
             }
+            inputFileData[entry.name] =
+                ZipEntryInfos(
+                    size = entry.size,
+                ) { zipFile.getInputStream(entry) }
         }
 
         val unmarshaller = context.createUnmarshaller()
@@ -234,11 +240,13 @@ class FileConverter(
                 return@forEach
             }
             val odx =
-                unmarshaller
-                    .unmarshal(
-                        XMLInputFactory.newFactory().createXMLEventReader(ByteArrayInputStream(entry.value)),
-                        ODX::class.java,
-                    ).value
+                entry.value.inputStream.invoke().use {
+                    unmarshaller
+                        .unmarshal(
+                            XMLInputFactory.newFactory().createXMLEventReader(it),
+                            ODX::class.java,
+                        ).value
+                }
             odxData[entry.key] = odx
         }
 
