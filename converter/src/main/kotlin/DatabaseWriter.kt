@@ -2361,14 +2361,21 @@ class DatabaseWriter(
                             ?: error("Couldn't find protstack with short name ${protStack.shortname}")
                     stack.offset()
                 }
-            if (this.parentrefs != null) {
-                TODO("Prot stack parent refs not supported")
-            }
+
+            val parentRefs =
+                this.parentrefs
+                    ?.parentref
+                    ?.map { it.offset() }
+                    ?.toIntArray()
+                    ?.let {
+                        Protocol.createParentRefsVector(builder, it)
+                    }
 
             Protocol.startProtocol(builder)
             Protocol.addDiagLayer(builder, diagLayer)
             comparamSpecs?.let { Protocol.addComParamSpec(builder, it) }
             protStack?.let { Protocol.addProtStack(builder, it) }
+            parentRefs?.let { Protocol.addParentRefs(builder, it) }
             Protocol.endProtocol(builder)
         }
 
