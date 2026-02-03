@@ -87,7 +87,7 @@ class ODXCollection(
             }
     }
 
-    val odxRevision: String by lazy {
+    val odxRevision: String? by lazy {
         // sort by date, or semantic version of revision?
         baseVariantODX
             ?.diaglayercontainer
@@ -103,7 +103,6 @@ class ODXCollection(
                 ?.docrevision
                 ?.lastOrNull()
                 ?.revisionlabel
-            ?: error("No doc revisions")
     }
 
     val diagLayerContainer: Map<String, DIAGLAYERCONTAINER> by lazy {

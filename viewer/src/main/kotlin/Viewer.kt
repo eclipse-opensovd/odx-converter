@@ -79,7 +79,7 @@ class Viewer : CliktCommand() {
         val bo = ByteArrayOutputStream()
         val o = PrintStream(bo)
 
-        o.indentedPrintln(0, "ECU: ${ecuData.ecuName} - Revision: ${ecuData.revision}")
+        o.indentedPrintln(0, "ECU: ${ecuData.ecuName} - Revision: ${ecuData.revision ?: "N/A"}")
 
         for (i in 0 until ecuData.variantsLength) {
             val variant = ecuData.variants(i)
