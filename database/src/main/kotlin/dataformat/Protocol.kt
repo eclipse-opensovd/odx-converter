@@ -55,8 +55,8 @@ class Protocol : Table() {
             null
         }
     }
-    fun parentRefs(j: Int) : dataformat.Protocol? = parentRefs(dataformat.Protocol(), j)
-    fun parentRefs(obj: dataformat.Protocol, j: Int) : dataformat.Protocol? {
+    fun parentRefs(j: Int) : dataformat.ParentRef? = parentRefs(dataformat.ParentRef(), j)
+    fun parentRefs(obj: dataformat.ParentRef, j: Int) : dataformat.ParentRef? {
         val o = __offset(10)
         return if (o != 0) {
             obj.__assign(__indirect(__vector(o) + j * 4), bb)
