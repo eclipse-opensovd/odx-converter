@@ -231,7 +231,7 @@ class DatabaseWriter(
     fun createEcuData(): ByteArray {
         val version = "2025-05-10".offset()
         val ecuName = odx.ecuName.offset()
-        val odxRevision = odx.odxRevision.offset()
+        val odxRevision = odx.odxRevision?.offset()
 
         val dtcs = EcuData.createDtcsVector(builder, dtcs.values.toIntArray())
         val variants =
@@ -244,7 +244,7 @@ class DatabaseWriter(
         EcuData.startEcuData(builder)
         EcuData.addVersion(builder, version)
         EcuData.addEcuName(builder, ecuName)
-        EcuData.addRevision(builder, odxRevision)
+        odxRevision?.let { EcuData.addRevision(builder, it) }
 
         EcuData.addDtcs(builder, dtcs)
         EcuData.addVariants(builder, variants)

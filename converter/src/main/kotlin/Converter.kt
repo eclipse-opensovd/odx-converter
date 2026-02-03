@@ -149,7 +149,9 @@ class FileConverter(
                     val mddFile = MDDFile.newBuilder()
                     mddFile.version = "2025-05-21"
                     mddFile.ecuName = odxCollection.ecuName
-                    mddFile.revision = odxCollection.odxRevision
+                    odxCollection.odxRevision?.let {
+                        mddFile.revision = it
+                    }
 
                     mddFile.putMetadata("created", getCurrentTimeReproducible().toString())
                     mddFile.putMetadata("source", inputFile.name)

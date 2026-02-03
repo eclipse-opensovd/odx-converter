@@ -87,7 +87,7 @@ message MDDFile {
   string version = 1;
   repeated FeatureFlag feature_flags = 2;
   string ecu_name = 3;
-  string revision = 4;
+  optional string revision = 4;
   map<string, string> metadata = 5;
   repeated Chunk chunks = 6;
   // Instead of individually signing each chunk, you sign all of them together
