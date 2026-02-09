@@ -42,6 +42,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.logging.Level
 import java.util.logging.Logger
+import java.util.logging.StreamHandler
 import java.util.zip.ZipFile
 import javax.xml.stream.XMLInputFactory
 import kotlin.io.path.fileSize
@@ -293,10 +294,24 @@ class Converter : CliktCommand(name = "odx-converter") {
             ),
         )
 
+    val logOnConsole: Boolean by option("--log-on-console")
+        .help(
+            "Whether to also log to console when processing multiple files (if only one file is processed, logging is always done on console in addition to the log file)",
+        ).flag(default = false)
+
     private var hadErrors: Boolean = false
     private val context: JAXBContext =
         org.eclipse.persistence.jaxb.JAXBContextFactory
             .createContext(arrayOf(ODX::class.java), null)
+
+    private fun createConsoleLogHandler(fileName: String): StreamHandler? {
+        if (pdxFiles.size == 1) {
+            return ConsoleHandlerWithFile(Level.INFO, null)
+        } else if (logOnConsole) {
+            return ConsoleHandlerWithFile(Level.INFO, fileName)
+        }
+        return null
+    }
 
     override fun run() {
         if (version) {
@@ -318,6 +333,7 @@ class Converter : CliktCommand(name = "odx-converter") {
                         measureTime {
                             val logger = Logger.getLogger(inputFile.name)
                             val logFile = File(outputDir, "${inputFile.nameWithoutExtension}.mdd.log")
+
                             WriteToFileHandler(
                                 fileLogLevel,
                                 logFile,
@@ -325,6 +341,11 @@ class Converter : CliktCommand(name = "odx-converter") {
                                 logger.level = fileLogLevel
                                 logger.useParentHandlers = false
                                 logger.addHandler(handler)
+
+                                val consoleHandler = createConsoleLogHandler(inputFile.name)
+                                consoleHandler?.let {
+                                    logger.addHandler(it)
+                                }
                                 try {
                                     val outFile = File(outputDir, "${inputFile.nameWithoutExtension}.mdd")
                                     val options =
@@ -344,7 +365,11 @@ class Converter : CliktCommand(name = "odx-converter") {
                                 } catch (e: Exception) {
                                     hadErrors = true
                                     logger.severe("Error while converting file ${inputFile.name}: ${e.message}", e)
-                                    println("Error while processing ${inputFile.name}: ${e.stackTraceToString()} ")
+                                    if (consoleHandler == null) {
+                                        println("Error while processing ${inputFile.name}: ${e.stackTraceToString()} ")
+                                    }
+                                } finally {
+                                    consoleHandler?.close()
                                 }
                             }
                         }
