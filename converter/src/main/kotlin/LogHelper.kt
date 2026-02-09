@@ -30,19 +30,34 @@ fun Logger.severe(
 class WriteToFileHandler(
     level: Level,
     file: File,
-) : StreamHandler(FileOutputStream(file), FileFormatter()),
+) : StreamHandler(FileOutputStream(file), DefaultFormatter()),
     AutoCloseable {
     init {
         setLevel(level)
     }
 }
 
-class FileFormatter : Formatter() {
+class ConsoleHandlerWithFile(
+    level: Level,
+    filename: String? = null,
+) : StreamHandler(System.out, DefaultFormatter(filename)),
+    AutoCloseable {
+    init {
+        setLevel(level)
+    }
+}
+
+class DefaultFormatter(
+    val filename: String? = null,
+) : Formatter() {
     private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS'Z'")
 
     override fun format(record: LogRecord): String {
         val dateTime = ZonedDateTime.now(UTC).format(formatter)
         val sb = StringBuilder("[$dateTime] [${record.level.name.padEnd(7)}] ${formatMessage(record)}")
+        if (filename != null) {
+            sb.insert(0, "[$filename] ")
+        }
         record.thrown?.let {
             sb.append(":\n")
             sb.append(it.stackTraceToString())
