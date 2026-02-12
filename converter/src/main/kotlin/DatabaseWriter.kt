@@ -2550,13 +2550,15 @@ class DatabaseWriter(
                 TODO("STRUCTURE shortnameref not supported for $this")
             }
             val structure =
-                odx.combinedDataObjectProps[this.structureref.idref]?.offset()
-                    ?: error("Couldn't find dop-structure-ref ${this.structureref.idref}")
+                this.structureref?.idref?.let {
+                    odx.combinedDataObjectProps[it]?.offset()
+                        ?: error("Couldn't find dop-structure-ref $it")
+                }
 
             Case.startCase(builder)
             Case.addShortName(builder, shortName)
             longName?.let { Case.addLongName(builder, it) }
-            Case.addStructure(builder, structure)
+            structure?.let { Case.addStructure(builder, it) }
             Case.addLowerLimit(builder, lowerLimit)
             Case.addUpperLimit(builder, upperLimit)
             Case.endCase(builder)
