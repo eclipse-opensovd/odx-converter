@@ -533,7 +533,7 @@ class DatabaseWriter(
                         it.offset()
                     }?.toIntArray()
                     ?.let {
-                        Request.createParamsVector(builder, it)
+                        Response.createParamsVector(builder, it)
                     }
 
             Response.startResponse(builder)
@@ -1144,7 +1144,7 @@ class DatabaseWriter(
     private fun PROGCODE.offset(): Int =
         cachedObjects.getOrPut(this) {
             val codeFile = this.codefile?.offset()
-            val encryption = this.entrypoint?.offset()
+            val encryption = this.encryption?.offset()
             val syntax = this.syntax?.offset()
             val revision = this.revision?.offset()
             val entrypoint = this.entrypoint?.offset()
@@ -1166,7 +1166,7 @@ class DatabaseWriter(
             encryption?.let { ProgCode.addEncryption(builder, it) }
             syntax?.let { ProgCode.addSyntax(builder, it) }
             revision?.let { ProgCode.addRevision(builder, it) }
-            entrypoint?.let { ProgCode.addEncryption(builder, it) }
+            entrypoint?.let { ProgCode.addEntrypoint(builder, it) }
             libraries?.let { ProgCode.addLibrary(builder, it) }
 
             ProgCode.endProgCode(builder)
@@ -1301,15 +1301,15 @@ class DatabaseWriter(
                     ?.value
                     ?.offset()
             val inverseValues =
-                if (invVtTi != null || invVtValue != null || this.compuinversevalue?.vt?.value != null) {
+                if (invVtTi != null || invVtValue != null || this.compuinversevalue?.v?.value != null) {
                     CompuValues.startCompuValues(builder)
-                    this.v?.value?.let {
+                    this.compuinversevalue?.v?.value?.let {
                         CompuValues.addV(builder, it)
                     }
-                    vtValue?.let {
+                    invVtValue?.let {
                         CompuValues.addVt(builder, it)
                     }
-                    vtTi?.let {
+                    invVtTi?.let {
                         CompuValues.addVtTi(builder, it)
                     }
                     CompuValues.endCompuValues(builder)
