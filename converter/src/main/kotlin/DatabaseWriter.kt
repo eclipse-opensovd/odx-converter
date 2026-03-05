@@ -53,6 +53,7 @@ import dataformat.EnvDataDesc
 import dataformat.Field
 import dataformat.FunctClass
 import dataformat.FunctionalGroup
+import dataformat.InternalConstr
 import dataformat.JobParam
 import dataformat.LeadingLengthInfoType
 import dataformat.LengthKeyRef
@@ -87,6 +88,7 @@ import dataformat.SDG
 import dataformat.SDGS
 import dataformat.SDOrSDG
 import dataformat.SDxorSDG
+import dataformat.ScaleConstr
 import dataformat.SimpleOrComplexValueEntry
 import dataformat.SimpleValue
 import dataformat.SingleEcuJob
@@ -153,6 +155,7 @@ import schema.odx.FUNCTIONALGROUP
 import schema.odx.GLOBALNEGRESPONSE
 import schema.odx.HIERARCHYELEMENT
 import schema.odx.INPUTPARAM
+import schema.odx.INTERNALCONSTR
 import schema.odx.LEADINGLENGTHINFOTYPE
 import schema.odx.LENGTHKEY
 import schema.odx.LIBRARY
@@ -181,6 +184,7 @@ import schema.odx.PROTSTACK
 import schema.odx.REQUEST
 import schema.odx.RESERVED
 import schema.odx.RESPONSE
+import schema.odx.SCALECONSTR
 import schema.odx.SIMPLEVALUE
 import schema.odx.SINGLEECUJOB
 import schema.odx.STANDARDLENGTHTYPE
@@ -841,12 +845,16 @@ class DatabaseWriter(
             }
         val physicalType = this.physicaltype?.offset()
         val compuMethod = this.compumethod?.offset()
+        val internalConstr = this.internalconstr?.offset()
+        val physConstr = this.physconstr?.offset()
 
         NormalDOP.startNormalDOP(builder)
         diagCodedType?.let { NormalDOP.addDiagCodedType(builder, it) }
         unit?.let { NormalDOP.addUnitRef(builder, it) }
         physicalType?.let { NormalDOP.addPhysicalType(builder, it) }
         compuMethod?.let { NormalDOP.addCompuMethod(builder, it) }
+        internalConstr?.let { NormalDOP.addInternalConstr(builder, it) }
+        physConstr?.let { NormalDOP.addPhysConstr(builder, it) }
 
         return NormalDOP.endNormalDOP(builder)
     }
@@ -1048,6 +1056,40 @@ class DatabaseWriter(
             this.displayradix?.let { PhysicalType.addDisplayRadix(builder, it.toFileFormatEnum()) }
 
             PhysicalType.endPhysicalType(builder)
+        }
+
+    private fun SCALECONSTR.offset(): Int =
+        cachedObjects.getOrPut(this) {
+            val shortLabel = this.shortlabel?.offset()
+            val lowerLimit = this.lowerlimit?.offset()
+            val upperLimit = this.upperlimit?.offset()
+
+            ScaleConstr.startScaleConstr(builder)
+            shortLabel?.let { ScaleConstr.addShortLabel(builder, it) }
+            lowerLimit?.let { ScaleConstr.addLowerLimit(builder, it) }
+            upperLimit?.let { ScaleConstr.addUpperLimit(builder, it) }
+            ScaleConstr.addValidity(builder, this.validity.toFileFormatEnum())
+            ScaleConstr.endScaleConstr(builder)
+        }
+
+    private fun INTERNALCONSTR.offset(): Int =
+        cachedObjects.getOrPut(this) {
+            val lowerLimit = this.lowerlimit?.offset()
+            val upperLimit = this.upperlimit?.offset()
+            val scaleConstrs =
+                this.scaleconstrs
+                    ?.scaleconstr
+                    ?.map { it.offset() }
+                    ?.toIntArray()
+                    ?.let {
+                        InternalConstr.createScaleConstrVector(builder, it)
+                    }
+
+            InternalConstr.startInternalConstr(builder)
+            lowerLimit?.let { InternalConstr.addLowerLimit(builder, it) }
+            upperLimit?.let { InternalConstr.addUpperLimit(builder, it) }
+            scaleConstrs?.let { InternalConstr.addScaleConstr(builder, it) }
+            InternalConstr.endInternalConstr(builder)
         }
 
     private fun schema.odx.DTC.offset(): Int =

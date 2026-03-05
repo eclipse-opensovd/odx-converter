@@ -24,6 +24,7 @@ import dataformat.Radix
 import dataformat.TableEntryRowFragment
 import dataformat.Termination
 import dataformat.TransmissionMode
+import dataformat.ValidType
 import schema.odx.ADDRESSING
 import schema.odx.CODEDCONST
 import schema.odx.COMPUCATEGORY
@@ -53,6 +54,7 @@ import schema.odx.TABLESTRUCT
 import schema.odx.TERMINATION
 import schema.odx.TRANSMODE
 import schema.odx.USAGE
+import schema.odx.VALIDTYPE
 import schema.odx.VALUE
 
 fun TRANSMODE.toFileFormatEnum(): Byte =
@@ -134,6 +136,14 @@ fun ROWFRAGMENT.toFileFormatEnum(): Byte =
     when (this) {
         ROWFRAGMENT.KEY -> TableEntryRowFragment.KEY
         ROWFRAGMENT.STRUCT -> TableEntryRowFragment.STRUCT
+    }
+
+fun VALIDTYPE.toFileFormatEnum(): Byte =
+    when (this) {
+        VALIDTYPE.VALID -> ValidType.VALID
+        VALIDTYPE.NOT_VALID -> ValidType.NOT_VALID
+        VALIDTYPE.NOT_DEFINED -> ValidType.NOT_DEFINED
+        VALIDTYPE.NOT_AVAILABLE -> ValidType.NOT_AVAILABLE
     }
 
 fun DIAGCLASSTYPE.toFileFormatEnum(): Byte =
