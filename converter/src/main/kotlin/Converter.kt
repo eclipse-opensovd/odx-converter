@@ -16,6 +16,7 @@ import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.help
 import com.github.ajalt.clikt.parameters.arguments.multiple
+import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.multiple
@@ -23,6 +24,7 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.pair
 import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.file
+import com.github.ajalt.clikt.parameters.types.int
 import converter.plugin.api.ConverterApi
 import converter.plugin.api.ConverterPlugin
 import converter.plugin.api.ConverterPluginProvider
@@ -301,6 +303,11 @@ class Converter : CliktCommand(name = "odx-converter") {
             "Whether to also log to console when processing multiple files (if only one file is processed, logging is always done on console in addition to the log file)",
         ).flag(default = false)
 
+    val parallel: Int by option("-j", "--parallel")
+        .help("Maximum number of files to process in parallel (default: number of available processors)")
+        .int()
+        .default(Runtime.getRuntime().availableProcessors())
+
     private var hadErrors: Boolean = false
     private val context: JAXBContext =
         org.eclipse.persistence.jaxb.JAXBContextFactory
@@ -323,7 +330,12 @@ class Converter : CliktCommand(name = "odx-converter") {
             exitProcess(0)
         }
         val stats = mutableListOf<ChunkStat>()
-        val executors = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
+        if (parallel <= 0) {
+            System.err.println("Invalid parallel value: $parallel, must be greater than 0")
+            exitProcess(-1)
+        }
+        val executors = Executors.newFixedThreadPool(parallel)
+        // sort by descending file size as a rough guesstimate of processing time
         pdxFiles.forEach { inputFile ->
             val outputDir = outputDir ?: inputFile.parentFile
 
