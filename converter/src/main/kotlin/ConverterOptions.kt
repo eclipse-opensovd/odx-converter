@@ -18,6 +18,7 @@ data class ConverterOptions(
     val lenient: Boolean = false,
     val includeJobFiles: Boolean = false,
     val partialJobFiles: List<PartialFilePattern> = emptyList(),
+    val withAudiences: List<String> = emptyList(),
 )
 
 @Serializable

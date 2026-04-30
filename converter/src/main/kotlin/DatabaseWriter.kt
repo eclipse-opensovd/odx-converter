@@ -210,6 +210,7 @@ import schema.odx.VALUE
 import java.util.logging.Logger
 import kotlin.collections.toIntArray
 import kotlin.collections.toUIntArray
+import kotlin.error
 
 class DatabaseWriter(
     private val logger: Logger,
@@ -1786,18 +1787,25 @@ class DatabaseWriter(
                     DiagLayer.createAdditionalAudiencesVector(builder, it)
                 }
         val resolvedLinks: List<DIAGCOMM> =
-            this.diagcomms?.diagcommproxy?.filterIsInstance<ODXLINK>()?.map {
-                odx.diagServices[it.idref] ?: odx.singleEcuJobs[it.idref]
-                    ?: error("Couldn't find reference ${it.idref}")
-            } ?: emptyList()
+            this.diagcomms
+                ?.diagcommproxy
+                ?.filterIsInstance<ODXLINK>()
+                ?.map {
+                    odx.diagServices[it.idref] ?: odx.singleEcuJobs[it.idref]
+                        ?: error("Couldn't find reference ${it.idref}")
+                }?.filterByConverterOptions(options) ?: emptyList()
 
         val diagServicesRaw =
             resolvedLinks.filterIsInstance<DIAGSERVICE>().map {
                 it.offset()
             } + (
-                this.diagcomms?.diagcommproxy?.filterIsInstance<DIAGSERVICE>()?.map {
-                    it.offset()
-                } ?: emptyList()
+                this.diagcomms
+                    ?.diagcommproxy
+                    ?.filterIsInstance<DIAGSERVICE>()
+                    ?.filterByConverterOptions(options)
+                    ?.map {
+                        it.offset()
+                    } ?: emptyList()
             )
 
         val diagServices =
@@ -1809,9 +1817,13 @@ class DatabaseWriter(
             resolvedLinks.filterIsInstance<SINGLEECUJOB>().map {
                 it.offset()
             } + (
-                this.diagcomms?.diagcommproxy?.filterIsInstance<SINGLEECUJOB>()?.map {
-                    it.offset()
-                } ?: emptyList()
+                this.diagcomms
+                    ?.diagcommproxy
+                    ?.filterIsInstance<SINGLEECUJOB>()
+                    ?.filterByConverterOptions(options)
+                    ?.map {
+                        it.offset()
+                    } ?: emptyList()
             )
 
         val singleEcuJobs =
@@ -2688,4 +2700,25 @@ class DatabaseWriter(
         }
 
     private fun ByteArray.offset(): Int = builder.createByteVector(this)
+
+    fun <T : DIAGCOMM> Collection<T>.filterByConverterOptions(options: ConverterOptions): List<T> =
+        this.filter { it.isIncludedWithOption(options) }
+
+    fun <T : DIAGCOMM> T.isIncludedWithOption(options: ConverterOptions): Boolean {
+        if (options.withAudiences.isEmpty() ||
+            this.audience?.enabledaudiencerefs?.enabledaudienceref == null ||
+            this.audience.enabledaudiencerefs.enabledaudienceref
+                .isNullOrEmpty()
+        ) {
+            return true
+        }
+        val audiences =
+            this.audience.enabledaudiencerefs.enabledaudienceref
+                .map {
+                    odx.additionalAudiences[it.idref] ?: error("Can't find additional audience ${it.idref}")
+                }.map {
+                    it.shortname
+                }
+        return options.withAudiences.any { aud -> audiences.any { aud.equals(it, true) } }
+    }
 }

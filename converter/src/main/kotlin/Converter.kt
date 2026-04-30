@@ -143,6 +143,20 @@ class FileConverter(
 
             val odxCollection = ODXCollection(odxData, odxRawSize)
 
+            if (options.withAudiences.isNotEmpty()) {
+                val validAudiences = odxCollection.additionalAudiences.values.map { it.shortname }
+                val invalidAudiences =
+                    options.withAudiences.filter { requested ->
+                        validAudiences.none { it.equals(requested, ignoreCase = true) }
+                    }
+                if (invalidAudiences.isNotEmpty()) {
+                    logger.warning(
+                        "The following audiences specified with --with-audience are not defined in the diagnostic description: " +
+                            "${invalidAudiences.joinToString(", ")}. Valid audiences are: ${validAudiences.joinToString(", ")}",
+                    )
+                }
+            }
+
             var compressionDuration: Duration = Duration.ZERO
             val plugins = retrievePlugins()
 
@@ -300,13 +314,21 @@ class Converter : CliktCommand(name = "odx-converter") {
 
     val logOnConsole: Boolean by option("--log-on-console")
         .help(
-            "Whether to also log to console when processing multiple files (if only one file is processed, logging is always done on console in addition to the log file)",
+            "Whether to also log to console when processing multiple files (if only one file is processed, " +
+                "logging is always done on console in addition to the log file)",
         ).flag(default = false)
 
     val parallel: Int by option("-j", "--parallel")
         .help("Maximum number of files to process in parallel (default: number of available processors)")
         .int()
         .default(Runtime.getRuntime().availableProcessors())
+
+    val withAudiences: List<String> by option("--with-audience")
+        .help(
+            "Includes services only when audience short names match - can be used multiple times, services without " +
+                "any enabled audience will always be included, but services with enabled audiences will only be " +
+                "included if at least one of the audience entries matches",
+        ).multiple()
 
     private var hadErrors: Boolean = false
     private val context: JAXBContext =
@@ -373,6 +395,7 @@ class Converter : CliktCommand(name = "odx-converter") {
                                                         it.second,
                                                     )
                                                 },
+                                            withAudiences = withAudiences,
                                         )
                                     val converter = FileConverter(logger, context)
                                     converter.convert(inputFile, outFile, options, stats)
