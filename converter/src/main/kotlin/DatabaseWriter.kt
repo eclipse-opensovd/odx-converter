@@ -187,6 +187,7 @@ import schema.odx.RESPONSE
 import schema.odx.SCALECONSTR
 import schema.odx.SIMPLEVALUE
 import schema.odx.SINGLEECUJOB
+import schema.odx.SNREF
 import schema.odx.STANDARDLENGTHTYPE
 import schema.odx.STATE
 import schema.odx.STATECHART
@@ -207,6 +208,7 @@ import schema.odx.UNIT
 import schema.odx.UNITGROUP
 import schema.odx.UNITSPEC
 import schema.odx.VALUE
+import java.util.logging.Level
 import java.util.logging.Logger
 import kotlin.collections.toIntArray
 import kotlin.collections.toUIntArray
@@ -224,6 +226,30 @@ class DatabaseWriter(
     private val baseVariantMap: Map<BASEVARIANT, Int>
     private val ecuVariantMap: Map<ECUVARIANT, Int>
     private val functionalGroupMap: Map<FUNCTIONALGROUP, Int>
+
+    /**
+     * Resolves a single element from [collection] by shortname.
+     * If multiple elements share the same shortname, this throws in strict mode
+     * or logs a SEVERE warning in lenient mode (and returns the first match).
+     */
+    private fun <T> resolveByShortname(
+        collection: Collection<T>,
+        shortname: String,
+        entityType: String,
+        selector: (T) -> String,
+    ): T? {
+        val matches = collection.filter { selector(it) == shortname }
+        if (matches.size > 1) {
+            val message =
+                "Duplicate shortname '$shortname' found for $entityType (${matches.size} matches). " +
+                    "Please fix the ODX file to ensure shortnames are unique."
+            if (!options.lenient) {
+                throw IllegalStateException("$message You can enable lenient mode, to convert this file with the first match being used.")
+            }
+            logger.log(Level.SEVERE, message)
+        }
+        return matches.firstOrNull()
+    }
 
     init {
         dtcs = odx.dtcs.values.associateWith { it.offset() }
@@ -374,10 +400,18 @@ class DatabaseWriter(
             val rows =
                 this.rowwrapper
                     .map { row ->
-                        if (row is TABLEROW) {
-                            row.offset()
-                        } else {
-                            error("Unsupported row type ${row.javaClass.simpleName}")
+                        when (row) {
+                            is TABLEROW -> {
+                                row.offset()
+                            }
+
+                            is ODXLINK -> {
+                                odx.tableRows[row.idref]?.offset() ?: error("Couldn't find odxlink/dop ${row.idref}")
+                            }
+
+                            else -> {
+                                error("Unsupported row type ${row.javaClass.simpleName}")
+                            }
                         }
                     }.toIntArray()
                     .let {
@@ -556,6 +590,66 @@ class DatabaseWriter(
             Response.endResponse(builder)
         }
 
+    private fun VALUE.resolveDopRef(): Int? {
+        this.dopsnref?.shortname?.let { shortName ->
+            val dop =
+                resolveByShortname(odx.combinedDataObjectProps.values, shortName, "DATA-OBJECT-PROP") {
+                    it.shortname
+                } ?: throw IllegalStateException("Couldn't find shortname ref $shortName")
+            return dop.offset()
+        }
+        this.dopref?.let {
+            return odx.combinedDataObjectProps[it.idref]?.offset()
+                ?: throw IllegalStateException("Couldn't find ${it.idref}")
+        }
+        return null
+    }
+
+    private fun LENGTHKEY.resolveDopRef(): Int? {
+        this.dopsnref?.shortname?.let { shortName ->
+            val dop =
+                resolveByShortname(odx.combinedDataObjectProps.values, shortName, "DATA-OBJECT-PROP") {
+                    it.shortname
+                } ?: throw IllegalStateException("Couldn't find shortname ref $shortName")
+            return dop.offset()
+        }
+        this.dopref?.let {
+            return odx.combinedDataObjectProps[it.idref]?.offset()
+                ?: throw IllegalStateException("Couldn't find ${it.idref}")
+        }
+        return null
+    }
+
+    private fun PHYSCONST.resolveDopRef(): Int? {
+        this.dopsnref?.shortname?.let { shortName ->
+            val dop =
+                resolveByShortname(odx.combinedDataObjectProps.values, shortName, "DATA-OBJECT-PROP") {
+                    it.shortname
+                } ?: throw IllegalStateException("Couldn't find shortname ref $shortName")
+            return dop.offset()
+        }
+        this.dopref?.let {
+            return odx.combinedDataObjectProps[it.idref]?.offset()
+                ?: throw IllegalStateException("Couldn't find ${it.idref}")
+        }
+        return null
+    }
+
+    private fun SYSTEM.resolveDopRef(): Int? {
+        this.dopsnref?.shortname?.let { shortName ->
+            val dop =
+                resolveByShortname(odx.combinedDataObjectProps.values, shortName, "DATA-OBJECT-PROP") {
+                    it.shortname
+                } ?: throw IllegalStateException("Couldn't find shortname ref $shortName")
+            return dop.offset()
+        }
+        this.dopref?.let {
+            return odx.combinedDataObjectProps[it.idref]?.offset()
+                ?: throw IllegalStateException("Couldn't find ${it.idref}")
+        }
+        return null
+    }
+
     private fun PARAM.offset(): Int =
         cachedObjects.getOrPut(this) {
             try {
@@ -566,16 +660,8 @@ class DatabaseWriter(
                 val specificData =
                     when (this) {
                         is VALUE -> {
-                            this.dopsnref?.shortname?.let {
-                                TODO("dop shortname ref in VALUE not supported ${this.dopsnref.shortname}")
-                            }
-                            val dop =
-                                this.dopref?.let {
-                                    val dop =
-                                        odx.combinedDataObjectProps[it.idref]
-                                            ?: error("Couldn't find ${it.idref}")
-                                    dop.offset()
-                                }
+                            // TODO FR find duplicated short name references, and log error
+                            val dop = resolveDopRef()
                             val physicalDefaultValue = this.physicaldefaultvalue?.offset()
 
                             Value.startValue(builder)
@@ -600,16 +686,7 @@ class DatabaseWriter(
                         }
 
                         is LENGTHKEY -> {
-                            if (this.dopsnref?.shortname != null) {
-                                TODO("DOP short name not supported ${this.dopsnref.shortname}")
-                            }
-                            val dop =
-                                this.dopref?.let {
-                                    val dop =
-                                        odx.combinedDataObjectProps[it.idref]
-                                            ?: error("Couldn't find ${it.idref}")
-                                    dop.offset()
-                                }
+                            val dop = this.resolveDopRef()
 
                             LengthKeyRef.startLengthKeyRef(builder)
                             dop?.let { LengthKeyRef.addDop(builder, it) }
@@ -638,17 +715,7 @@ class DatabaseWriter(
 
                         is PHYSCONST -> {
                             val physConstValue = this.physconstantvalue?.offset()
-                            val dop =
-                                this.dopref?.let {
-                                    val dop =
-                                        odx.combinedDataObjectProps[it.idref]
-                                            ?: error("couldn't find dop ${it.idref}")
-                                    dop.offset()
-                                }
-                            this.dopsnref?.shortname?.let {
-                                TODO("DOP short name not supported ${this.dopsnref.shortname}")
-                            }
-
+                            val dop = this.resolveDopRef()
                             PhysConst.startPhysConst(builder)
                             physConstValue?.let { PhysConst.addPhysConstantValue(builder, it) }
                             dop?.let { PhysConst.addDop(builder, it) }
@@ -662,18 +729,8 @@ class DatabaseWriter(
                         }
 
                         is SYSTEM -> {
-                            this.dopsnref?.shortname?.let {
-                                TODO("DOP short name ref ${this.dopsnref.shortname}")
-                            }
-
                             val sysParam = this.sysparam.offset()
-                            val dop =
-                                this.dopref?.let {
-                                    val dop =
-                                        odx.combinedDataObjectProps[it.idref]
-                                            ?: error("Couldn't find DOP ${it.idref}")
-                                    dop.offset()
-                                }
+                            val dop = this.resolveDopRef()
 
                             dataformat.System.startSystem(builder)
 
@@ -703,6 +760,18 @@ class DatabaseWriter(
                                 } else {
                                     tableKeyReference = table.offset()
                                     tableKeyReferenceType = TableKeyReference.TableDop
+                                }
+                            } else if (entry is SNREF) {
+                                val table = resolveByShortname(odx.tables.values, entry.shortname, "TABLE") { it.shortname }
+                                val tableRow = resolveByShortname(odx.tableRows.values, entry.shortname, "TABLE-ROW") { it.shortname }
+                                if (tableRow != null) {
+                                    tableKeyReference = tableRow.offset()
+                                    tableKeyReferenceType = TableKeyReference.TableRow
+                                } else if (table != null) {
+                                    tableKeyReference = table.offset()
+                                    tableKeyReferenceType = TableKeyReference.TableDop
+                                } else {
+                                    error("Unknown type for TABLE-KEY SNREF ${this.id} entry ${entry.javaClass.simpleName}")
                                 }
                             } else {
                                 error("Unknown type for TABLE-KEY/TABLEROW ${this.id} entry ${entry.javaClass.simpleName}")
@@ -1687,7 +1756,7 @@ class DatabaseWriter(
                 ?.protocolsnref
                 ?.map {
                     val protocol =
-                        odx.protocols.values.firstOrNull { p -> p.shortname == it.shortname }
+                        resolveByShortname(odx.protocols.values, it.shortname, "PROTOCOL") { p -> p.shortname }
                             ?: error("Couldn't find protocol ${it.shortname}")
                     protocol.offset()
                 }?.toIntArray()
@@ -2061,7 +2130,7 @@ class DatabaseWriter(
             lateinit var diagService: DIAGSERVICE
             val diagServiceOffset =
                 this.diagcommsnref.shortname.let { shortname ->
-                    diagService = odx.diagServices.values.firstOrNull { it.shortname == shortname }
+                    diagService = resolveByShortname(odx.diagServices.values, shortname, "DIAG-SERVICE") { it.shortname }
                         ?: error("Couldn't find diag service $shortname")
                     diagService.offset()
                 }
@@ -2079,23 +2148,25 @@ class DatabaseWriter(
             lateinit var diagService: DIAGSERVICE
             val diagServiceOffset =
                 this.diagcommsnref.shortname.let { shortname ->
-                    diagService = odx.diagServices.values.firstOrNull { it.shortname == shortname }
+                    diagService = resolveByShortname(odx.diagServices.values, shortname, "DIAG-SERVICE") { it.shortname }
                         ?: error("Couldn't find diag service $shortname")
                     diagService.offset()
                 }
             val outParam =
                 this.outparamifsnref?.shortname?.let { expectedShortName ->
-                    diagService.posresponserefs
-                        ?.posresponseref
-                        ?.flatMap { pr ->
-                            val posResponse =
-                                odx.posResponses[pr.idref]
-                                    ?: error("Couldn't find pos response ${pr.idref}")
-                            posResponse.params?.param ?: emptyList()
-                        }?.firstOrNull { params ->
-                            params.shortname == expectedShortName
-                        }?.offset()
-                        ?: error("Couldn't find param for shortName $expectedShortName")
+                    val allParams =
+                        diagService.posresponserefs
+                            ?.posresponseref
+                            ?.flatMap { pr ->
+                                val posResponse =
+                                    odx.posResponses[pr.idref]
+                                        ?: error("Couldn't find pos response ${pr.idref}")
+                                posResponse.params?.param ?: emptyList()
+                            } ?: emptyList()
+                    (
+                        resolveByShortname(allParams, expectedShortName, "PARAM") { it.shortname }
+                            ?: error("Couldn't find param for shortName $expectedShortName")
+                    ).offset()
                 }
 
             this.outparamifsnpathref?.let {
@@ -2396,10 +2467,11 @@ class DatabaseWriter(
                 }
             val protStack =
                 this.protstacksnref?.let { protStack ->
-                    val stack =
+                    val allProtStacks =
                         odx.comparamSpecs.values
                             .flatMap { it.protstacks?.protstack ?: emptyList() }
-                            .firstOrNull { it.shortname == protStack.shortname }
+                    val stack =
+                        resolveByShortname(allProtStacks, protStack.shortname, "PROT-STACK") { it.shortname }
                             ?: error("Couldn't find protstack with short name ${protStack.shortname}")
                     stack.offset()
                 }
@@ -2484,7 +2556,7 @@ class DatabaseWriter(
             val protocol =
                 this.protocolsnref?.shortname?.let { shortName ->
                     val protocolOdx =
-                        odx.protocols.values.firstOrNull { it.shortname == shortName }
+                        resolveByShortname(odx.protocols.values, shortName, "PROTOCOL") { it.shortname }
                             ?: error("Couldn't find PROTOCOL $shortName")
                     protocolOdx.offset()
                 }
@@ -2492,7 +2564,7 @@ class DatabaseWriter(
             val protStack =
                 this.protstacksnref?.let {
                     val protStackOdx =
-                        odx.protStacks.values.firstOrNull { it.shortname == this.protstacksnref.shortname }
+                        resolveByShortname(odx.protStacks.values, this.protstacksnref.shortname, "PROT-STACK") { it.shortname }
                             ?: error("Can't find protocol ${this.protstacksnref.shortname}")
 
                     protStackOdx.offset()
