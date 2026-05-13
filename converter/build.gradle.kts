@@ -122,7 +122,7 @@ fun Manifest.addAttributes() {
     val timestamp = Instant.ofEpochSecond(epochSeconds).toString()
 
     attributes(
-        "Implementation-Title" to project.name,
+        "Implementation-Title" to "odx-converter",
         "Implementation-Version" to rootProject.version,
         "Implementation-Commit" to commitHash,
         "Implementation-BuildDate" to timestamp,

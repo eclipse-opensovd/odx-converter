@@ -15,6 +15,9 @@ import java.io.File
 import java.util.jar.JarFile
 
 object ManifestReader {
+    val title: String
+        get() = attributes?.getValue("Implementation-Title") ?: "odx-converter"
+
     val version: String
         get() = attributes?.getValue("Implementation-Version") ?: "development"
 
