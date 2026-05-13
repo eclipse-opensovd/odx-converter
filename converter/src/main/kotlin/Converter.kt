@@ -173,7 +173,10 @@ class FileConverter(
                     mddFile.putMetadata("created", getCurrentTimeReproducible().toString())
                     mddFile.putMetadata("source", inputFile.name)
                     mddFile.putMetadata("options", Json.encodeToString(options))
-                    mddFile.putMetadata("converter", "${ManifestReader.version} (${ManifestReader.commitHash.take(7)})")
+                    mddFile.putMetadata(
+                        "converter",
+                        "${ManifestReader.title} ${ManifestReader.version} (${ManifestReader.commitHash.take(7)})",
+                    )
                     mddFile.putMetadata(
                         "plugins",
                         plugins.joinToString(", ") { "${it.getPluginIdentifier()}@${it.getPluginVersion()}" },
@@ -350,6 +353,7 @@ class Converter : CliktCommand(name = "odx-converter") {
 
     override fun run() {
         if (version) {
+            println(ManifestReader.title)
             println("Version: " + ManifestReader.version + "+" + ManifestReader.commitHash.take(7))
             println("Built: " + ManifestReader.buildDate)
             println("Commit: " + ManifestReader.commitHash)
@@ -437,7 +441,7 @@ class Converter : CliktCommand(name = "odx-converter") {
 
 fun main(args: Array<String>) {
     val converter = Converter()
-    println("${converter.commandName} - version: ${ManifestReader.version}+${ManifestReader.commitHash.take(7)}\n")
+    println("${ManifestReader.title} - version: ${ManifestReader.version}+${ManifestReader.commitHash.take(7)}\n")
     if (args.isEmpty()) {
         converter.main(arrayOf("--help"))
     } else {
