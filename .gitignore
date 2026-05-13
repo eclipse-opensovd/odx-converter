@@ -46,3 +46,5 @@ bin/
 *.mdd
 *.log
 *.xsd
+
+kotlin-compiler*

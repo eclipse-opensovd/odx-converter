@@ -96,7 +96,7 @@ tasks.shadowJar {
 
 fun determineCommitHash(): String? {
     // when built in a pipeline, always prefer the hash from the pipeline
-    val commitHash = System.getenv("GITHUB_SHA")
+    val commitHash = System.getenv("GITHUB_SHA") ?: System.getenv("CI_COMMIT_SHA")
     if (commitHash != null) {
         return commitHash
     }

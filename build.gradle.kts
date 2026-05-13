@@ -29,6 +29,9 @@ version = "0.1.0-SNAPSHOT"
 if (System.getenv("GITHUB_REF")?.contains("refs/tags/") == true) {
     // When we build a tag from the pipeline, override the version with the tag name
     version = System.getenv("GITHUB_REF_NAME")
+} else if (System.getenv("CI_COMMIT_TAG") != null) {
+    // GitLab CI: CI_COMMIT_TAG is only set on tag pipelines
+    version = System.getenv("CI_COMMIT_TAG")
 }
 
 allprojects {
