@@ -141,7 +141,7 @@ class FileConverter(
 
             val odxRawSize = inputFileData.filter { it.key.contains(".odx") }.map { it.value.size }.sum()
 
-            val odxCollection = ODXCollection(odxData, odxRawSize)
+            val odxCollection = ODXCollectionGroup(odxData, odxRawSize)
 
             if (options.withAudiences.isNotEmpty()) {
                 val validAudiences = odxCollection.additionalAudiences.values.map { it.shortname }

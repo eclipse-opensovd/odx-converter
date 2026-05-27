@@ -214,7 +214,7 @@ import kotlin.error
 
 class DatabaseWriter(
     private val logger: Logger,
-    private val odx: ODXCollection,
+    private val odx: ODXCollectionGroup,
     private val options: ConverterOptions,
 ) {
     private val builder = FlatBufferBuilder()

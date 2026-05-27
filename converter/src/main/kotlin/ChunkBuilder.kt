@@ -21,7 +21,7 @@ class ChunkBuilder {
     fun createJobsChunks(
         logger: Logger,
         inputData: Map<String, ZipEntryInfos>,
-        odx: ODXCollection,
+        odx: ODXCollectionGroup,
         options: ConverterOptions,
     ): List<Chunk.Builder> {
         if (!options.includeJobFiles) {
@@ -52,7 +52,7 @@ class ChunkBuilder {
     fun createPartialChunks(
         logger: Logger,
         inputData: Map<String, ZipEntryInfos>,
-        odx: ODXCollection,
+        odx: ODXCollectionGroup,
         options: ConverterOptions,
     ): List<Chunk.Builder> {
         if (options.partialJobFiles.isEmpty()) {
@@ -113,7 +113,7 @@ class ChunkBuilder {
 
     fun createEcuDataChunk(
         logger: Logger,
-        odxCollection: ODXCollection,
+        odxCollection: ODXCollectionGroup,
         options: ConverterOptions,
     ): Chunk.Builder {
         val dw = DatabaseWriter(logger = logger, odx = odxCollection, options = options)
