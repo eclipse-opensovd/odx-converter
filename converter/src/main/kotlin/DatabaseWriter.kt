@@ -227,10 +227,10 @@ class DatabaseWriter(
     private val functionalGroupMap: Map<FUNCTIONALGROUP, Int>
 
     init {
-        dtcs = odx.dtcs.values.associateWith { it.offset() }
-        baseVariantMap = odx.basevariants.values.associateWith { it.offset() }
-        ecuVariantMap = odx.ecuvariants.values.associateWith { it.offset() }
-        functionalGroupMap = odx.functionalGroups.values.associateWith { it.offset() }
+        dtcs = odx.dtcs.associateWith { it.offset() }
+        baseVariantMap = odx.basevariants.associateWith { it.offset() }
+        ecuVariantMap = odx.ecuvariants.associateWith { it.offset() }
+        functionalGroupMap = odx.functionalGroups.associateWith { it.offset() }
     }
 
     fun createEcuData(): ByteArray {
@@ -308,14 +308,14 @@ class DatabaseWriter(
         cachedObjects.getOrPut(this) {
             val diagComm = (this as DIAGCOMM).offsetInternal()
             val request =
-                odx.requests[this.requestref.idref]?.offset()
+                odx.resolveRequest(this.requestref)?.offset()
                     ?: error("Couldn't find requestref ${this.requestref.idref}")
             val posResponses =
                 this.posresponserefs
                     ?.posresponseref
                     ?.map {
                         val pr =
-                            odx.posResponses[it.idref]
+                            odx.resolvePosResponse(it)
                                 ?: error("Couldn't find response ${it.idref}")
                         pr.offset()
                     }?.toIntArray()
@@ -327,7 +327,7 @@ class DatabaseWriter(
                     ?.negresponseref
                     ?.map {
                         val nr =
-                            odx.negResponses[it.idref]
+                            odx.resolveNegResponse(it)
                                 ?: error("Couldn't find response ${it.idref}")
                         nr.offset()
                     }?.toIntArray()
@@ -364,9 +364,9 @@ class DatabaseWriter(
             val longName = this.longname?.offset()
             val keyLabel = this.keylabel?.offset()
             val keyDop =
-                this.keydopref?.idref?.let {
+                this.keydopref?.let {
                     val dop =
-                        odx.combinedDataObjectProps[it] ?: error("Couldn't find dop $it")
+                        odx.resolveCombinedDop(it) ?: error("Couldn't find dop ${it.idref}")
                     dop.offset()
                 }
             val structLabel = this.structlabel?.offset()
@@ -416,8 +416,8 @@ class DatabaseWriter(
 
             val diagComm =
                 if (this.diagcommref != null) {
-                    val diagService = this.diagcommref?.idref?.let { odx.diagServices[it] }
-                    val ecuJob = this.diagcommref?.idref?.let { odx.singleEcuJobs[it] }
+                    val diagService = this.diagcommref?.let { odx.resolveDiagService(it) }
+                    val ecuJob = this.diagcommref?.let { odx.resolveSingleEcuJob(it) }
                     if (diagService == null && ecuJob == null) {
                         error("Couldn't resolve ${this.diagcommref.idref}")
                     } else if (diagService != null) {
@@ -461,10 +461,9 @@ class DatabaseWriter(
 
             val caption =
                 this.sdgcaption?.shortname?.offset() ?: this.sdgcaptionref
-                    ?.idref
                     ?.let {
                         val sdgCaption =
-                            odx.sdgCaptions[it] ?: error("Couldn't find sdg-caption $it")
+                            odx.resolveSdgCaption(it) ?: error("Couldn't find sdg-caption ${it.idref}")
                         sdgCaption.shortname
                     }?.offset()
 
@@ -573,7 +572,7 @@ class DatabaseWriter(
                             val dop =
                                 this.dopref?.let {
                                     val dop =
-                                        odx.combinedDataObjectProps[it.idref]
+                                        odx.resolveCombinedDop(it)
                                             ?: error("Couldn't find ${it.idref}")
                                     dop.offset()
                                 }
@@ -607,7 +606,7 @@ class DatabaseWriter(
                             val dop =
                                 this.dopref?.let {
                                     val dop =
-                                        odx.combinedDataObjectProps[it.idref]
+                                        odx.resolveCombinedDop(it)
                                             ?: error("Couldn't find ${it.idref}")
                                     dop.offset()
                                 }
@@ -642,7 +641,7 @@ class DatabaseWriter(
                             val dop =
                                 this.dopref?.let {
                                     val dop =
-                                        odx.combinedDataObjectProps[it.idref]
+                                        odx.resolveCombinedDop(it)
                                             ?: error("couldn't find dop ${it.idref}")
                                     dop.offset()
                                 }
@@ -671,7 +670,7 @@ class DatabaseWriter(
                             val dop =
                                 this.dopref?.let {
                                     val dop =
-                                        odx.combinedDataObjectProps[it.idref]
+                                        odx.resolveCombinedDop(it)
                                             ?: error("Couldn't find DOP ${it.idref}")
                                     dop.offset()
                                 }
@@ -694,10 +693,10 @@ class DatabaseWriter(
                             var tableKeyReference: Int
                             var tableKeyReferenceType: UByte
                             if (entry is ODXLINK) {
-                                val table = odx.tables[entry.idref]
+                                val table = odx.resolveTable(entry)
                                 if (table == null) {
                                     val row =
-                                        odx.tableRows[entry.idref]
+                                        odx.resolveTableRow(entry)
                                             ?: error("ODXLINK ${this.id} is neither TABLE nor TABLE-KEY")
                                     tableKeyReference = row.offset()
                                     tableKeyReferenceType = TableKeyReference.TableRow
@@ -719,9 +718,9 @@ class DatabaseWriter(
                             val param = (this as PARAM).offset()
                             val target = this.target?.toFileFormatEnum()
                             val tableRow =
-                                this.tablerowref.idref?.let {
+                                this.tablerowref?.let {
                                     val row =
-                                        odx.tableRows[it] ?: error("Couldn't find TABLE-ROW $it")
+                                        odx.resolveTableRow(it) ?: error("Couldn't find TABLE-ROW ${it.idref}")
                                     row.offset()
                                 }
 
@@ -737,7 +736,7 @@ class DatabaseWriter(
                                 TODO("TABLE-KEY-SNREF not supported ${this.shortname}")
                             }
                             val tableKey =
-                                odx.tableKeys[this.tablekeyref.idref]?.offset()
+                                odx.resolveTableKey(this.tablekeyref)?.offset()
                                     ?: error("Couldn't find TABLE-KEY ${this.tablekeyref.idref}")
 
                             TableStruct.startTableStruct(builder)
@@ -829,7 +828,7 @@ class DatabaseWriter(
 
     private fun PARAMLENGTHINFOTYPE.toParamLengthInfoType(): Int {
         val lengthKey =
-            odx.lengthKeys[this.lengthkeyref.idref]?.offset()
+            odx.resolveLengthKey(this.lengthkeyref)?.offset()
                 ?: error("Unknown length key reference ${this.lengthkeyref.idref}")
 
         ParamLengthInfoType.startParamLengthInfoType(builder)
@@ -841,7 +840,7 @@ class DatabaseWriter(
         val diagCodedType = this.diagcodedtype?.offset()
         val unit =
             this.unitref?.let {
-                val unit = odx.units[it.idref] ?: error("Couldn't find unit ${it.idref}")
+                val unit = odx.resolveUnit(it) ?: error("Couldn't find unit ${it.idref}")
                 unit.offset()
             }
         val physicalType = this.physicaltype?.offset()
@@ -929,7 +928,7 @@ class DatabaseWriter(
             val physicaldimension =
                 this.physicaldimensionref?.let { ref ->
                     val physDimension =
-                        odx.physDimensions[ref.idref]
+                        odx.resolvePhysDimension(ref)
                             ?: error("Couldn't find physical dimension ${ref.idref}")
                     physDimension.offset()
                 }
@@ -979,7 +978,7 @@ class DatabaseWriter(
         val basicStructure =
             this.basicstructureref?.let {
                 val dop =
-                    odx.combinedDataObjectProps[it.idref]
+                    odx.resolveCombinedDop(it)
                         ?: error("Couldn't find dop ${it.idref}")
                 dop.offset()
             }
@@ -989,7 +988,7 @@ class DatabaseWriter(
         val envDataRef =
             this.envdatadescref?.let {
                 val dop =
-                    odx.combinedDataObjectProps[it.idref]
+                    odx.resolveCombinedDop(it)
                         ?: error("Couldn't find dop ${it.idref}")
                 dop.offset()
             }
@@ -1028,7 +1027,7 @@ class DatabaseWriter(
                 ?.envdataref
                 ?.map {
                     val envData =
-                        odx.envDatas[it.idref] ?: error("Couldn't find env data ${it.idref}")
+                        odx.resolveEnvData(it) ?: error("Couldn't find env data ${it.idref}")
                     envData.offset()
                 }?.toIntArray()
                 ?.let {
@@ -1196,7 +1195,7 @@ class DatabaseWriter(
                     ?.libraryref
                     ?.map { ref ->
                         val library =
-                            odx.libraries[ref.idref]
+                            odx.resolveLibrary(ref)
                                 ?: error("Couldn't find LIBRARY ${ref.idref}")
                         library.offset()
                     }?.toIntArray()
@@ -1397,7 +1396,7 @@ class DatabaseWriter(
                     if (it is schema.odx.DTC) {
                         it.offset()
                     } else if (it is ODXLINK) {
-                        val dop = odx.dtcs[it.idref] ?: error("Couldn't find DTC ${it.idref}")
+                        val dop = odx.resolveDtc(it) ?: error("Couldn't find DTC ${it.idref}")
                         dop.offset()
                     } else {
                         error("Unsupported DTC type ${it::class.java.simpleName}")
@@ -1472,7 +1471,7 @@ class DatabaseWriter(
             val dop =
                 this.dataobjectpropref?.let {
                     val dop =
-                        odx.combinedDataObjectProps[it.idref]
+                        odx.resolveCombinedDop(it)
                             ?: error("Couldn't find ${it.idref}")
                     dop.offset()
                 }
@@ -1508,7 +1507,7 @@ class DatabaseWriter(
                         aa
                             .map {
                                 val aud =
-                                    odx.additionalAudiences[it.idref]
+                                    odx.resolveAdditionalAudience(it)
                                         ?: error("Can't find additional audience ${it.idref}")
                                 aud.offset()
                             }.toIntArray(),
@@ -1522,7 +1521,7 @@ class DatabaseWriter(
                         aa
                             .map {
                                 val aud =
-                                    odx.additionalAudiences[it.idref]
+                                    odx.resolveAdditionalAudience(it)
                                         ?: error("Can't find additional audience ${it.idref}")
                                 aud.offset()
                             }.toIntArray(),
@@ -1553,7 +1552,7 @@ class DatabaseWriter(
     private fun PRECONDITIONSTATEREF.offset(): Int =
         cachedObjects.getOrPut(this) {
             val state =
-                odx.states[this.idref]?.offset() ?: error("Couldn't find STATE ${this.idref}")
+                odx.resolveState(this)?.offset() ?: error("Couldn't find STATE ${this.idref}")
             val value = this.value?.offset()
             val inParamIfSnRef = this.inparamifsnref?.shortname?.offset()
             val inParamIfSnPathRef = this.inparamifsnpathref?.shortnamepath?.offset()
@@ -1572,7 +1571,7 @@ class DatabaseWriter(
             val stateTransition =
                 this.idref?.let {
                     val stateTransition =
-                        odx.stateTransitions[this.idref]
+                        odx.resolveStateTransition(this)
                             ?: error("Couldn't find STATETRANSITION ${this.idref}")
                     stateTransition.offset()
                 }
@@ -1594,7 +1593,7 @@ class DatabaseWriter(
             val dop =
                 this.dopbaseref?.let {
                     val dop =
-                        odx.combinedDataObjectProps[it.idref]
+                        odx.resolveCombinedDop(it)
                             ?: error("Can't find DOP ${it.idref}")
                     dop.offset()
                 }
@@ -1616,7 +1615,7 @@ class DatabaseWriter(
             val dop =
                 this.dopbaseref?.let {
                     val dop =
-                        odx.combinedDataObjectProps[it.idref]
+                        odx.resolveCombinedDop(it)
                             ?: error("Can't find DOP ${it.idref}")
                     dop.offset()
                 }
@@ -1636,7 +1635,7 @@ class DatabaseWriter(
             val dop =
                 this.dopbaseref?.let {
                     val dop =
-                        odx.combinedDataObjectProps[it.idref]
+                        odx.resolveCombinedDop(it)
                             ?: error("Can't find DOP ${it.idref}")
                     dop.offset()
                 }
@@ -1657,7 +1656,7 @@ class DatabaseWriter(
                 ?.functclassref
                 ?.map {
                     val functClass =
-                        odx.functClasses[it.idref]
+                        odx.resolveFunctClass(it)
                             ?: error("Couldn't find funct class ${it.idref}")
                     functClass.offset()
                 }?.toIntArray()
@@ -1688,7 +1687,7 @@ class DatabaseWriter(
                 ?.protocolsnref
                 ?.map {
                     val protocol =
-                        odx.protocols.values.firstOrNull { p -> p.shortname == it.shortname }
+                        odx.protocols.firstOrNull { p -> p.shortname == it.shortname }
                             ?: error("Couldn't find protocol ${it.shortname}")
                     protocol.offset()
                 }?.toIntArray()
@@ -1791,7 +1790,7 @@ class DatabaseWriter(
                 ?.diagcommproxy
                 ?.filterIsInstance<ODXLINK>()
                 ?.map {
-                    odx.diagServices[it.idref] ?: odx.singleEcuJobs[it.idref]
+                    odx.resolveDiagService(it) ?: odx.resolveSingleEcuJob(it)
                         ?: error("Couldn't find reference ${it.idref}")
                 }?.filterByConverterOptions(options) ?: emptyList()
 
@@ -1955,9 +1954,7 @@ class DatabaseWriter(
         }
 
     fun PARENTREF.offset(): Int {
-        val resolved =
-            odx.basevariants[this.idref] ?: odx.ecuvariants[this.idref] ?: odx.protocols[this.idref]
-                ?: odx.functionalGroups[this.idref] ?: odx.tables[this.idref] ?: odx.ecuSharedDatas[this.idref]
+        val resolved = odx.resolveParent(this)
         val resolvedOffs =
             when (resolved) {
                 is BASEVARIANT -> resolved.offset()
@@ -2073,7 +2070,7 @@ class DatabaseWriter(
             lateinit var diagService: DIAGSERVICE
             val diagServiceOffset =
                 this.diagcommsnref.shortname.let { shortname ->
-                    diagService = odx.diagServices.values.firstOrNull { it.shortname == shortname }
+                    diagService = odx.diagServices.firstOrNull { it.shortname == shortname }
                         ?: error("Couldn't find diag service $shortname")
                     diagService.offset()
                 }
@@ -2091,7 +2088,7 @@ class DatabaseWriter(
             lateinit var diagService: DIAGSERVICE
             val diagServiceOffset =
                 this.diagcommsnref.shortname.let { shortname ->
-                    diagService = odx.diagServices.values.firstOrNull { it.shortname == shortname }
+                    diagService = odx.diagServices.firstOrNull { it.shortname == shortname }
                         ?: error("Couldn't find diag service $shortname")
                     diagService.offset()
                 }
@@ -2101,7 +2098,7 @@ class DatabaseWriter(
                         ?.posresponseref
                         ?.flatMap { pr ->
                             val posResponse =
-                                odx.posResponses[pr.idref]
+                                odx.resolvePosResponse(pr)
                                     ?: error("Couldn't find pos response ${pr.idref}")
                             posResponse.params?.param ?: emptyList()
                         }?.firstOrNull { params ->
@@ -2161,8 +2158,7 @@ class DatabaseWriter(
                 this.dataobjectprops
                     ?.dataobjectprop
                     ?.map {
-                        val dop = odx.dataObjectProps[it.id] ?: error("Can't find DOP ${it.id}")
-                        dop.offset()
+                        it.offset()
                     }?.toIntArray()
                     ?.let {
                         ComParamSubSet.createDataObjectPropsVector(builder, it)
@@ -2185,7 +2181,7 @@ class DatabaseWriter(
                 this.unitrefs
                     ?.unitref
                     ?.map {
-                        val unit = odx.units[it.idref] ?: error("Couldn't find unit $it")
+                        val unit = odx.resolveUnit(it) ?: error("Couldn't find unit $it")
                         unit.offset()
                     }?.toIntArray()
                     ?.let {
@@ -2213,8 +2209,7 @@ class DatabaseWriter(
                 this.units
                     ?.unit
                     ?.map {
-                        val unit = odx.units[it.id] ?: error("Unit ${it.id} not found")
-                        unit.offset()
+                        it.offset()
                     }?.toIntArray()
                     ?.let {
                         UnitSpec.createUnitsVector(builder, it)
@@ -2244,7 +2239,7 @@ class DatabaseWriter(
                     val dop =
                         this.dataobjectpropref?.let {
                             val dop =
-                                odx.combinedDataObjectProps[it.idref]
+                                odx.resolveCombinedDop(it)
                                     ?: error("Couldn't find ${it.idref}")
                             dop.offset()
                         }
@@ -2402,14 +2397,14 @@ class DatabaseWriter(
             val comparamSpecs =
                 this.comparamspecref?.let {
                     val comParamSpec =
-                        odx.comparamSpecs[it.idref]
+                        odx.resolveComParamSpec(it)
                             ?: error("Couldn't find com param spec ${it.idref}")
                     comParamSpec.offset()
                 }
             val protStack =
                 this.protstacksnref?.let { protStack ->
                     val stack =
-                        odx.comparamSpecs.values
+                        odx.comparamSpecs
                             .flatMap { it.protstacks?.protstack ?: emptyList() }
                             .firstOrNull { it.shortname == protStack.shortname }
                             ?: error("Couldn't find protstack with short name ${protStack.shortname}")
@@ -2458,7 +2453,7 @@ class DatabaseWriter(
                     ?.comparamsubsetref
                     ?.map {
                         val comparamSubSet =
-                            odx.comParamSubSets[it.idref]
+                            odx.resolveComParamSubSet(it)
                                 ?: error("Couldn't find com param subset ${it.idref}")
                         comparamSubSet.offset()
                     }?.toIntArray()
@@ -2480,8 +2475,8 @@ class DatabaseWriter(
     private fun COMPARAMREF.offset(): Int =
         cachedObjects.getOrPut(this) {
             val comParam =
-                odx.comparams[this.idref]?.offset()
-                    ?: odx.complexComparams[this.idref]?.offset()
+                odx.resolveComparam(this)?.offset()
+                    ?: odx.resolveComplexComparam(this)?.offset()
 
             if (comParam == null) {
                 if (!options.lenient) {
@@ -2496,7 +2491,7 @@ class DatabaseWriter(
             val protocol =
                 this.protocolsnref?.shortname?.let { shortName ->
                     val protocolOdx =
-                        odx.protocols.values.firstOrNull { it.shortname == shortName }
+                        odx.protocols.firstOrNull { it.shortname == shortName }
                             ?: error("Couldn't find PROTOCOL $shortName")
                     protocolOdx.offset()
                 }
@@ -2504,7 +2499,7 @@ class DatabaseWriter(
             val protStack =
                 this.protstacksnref?.let {
                     val protStackOdx =
-                        odx.protStacks.values.firstOrNull { it.shortname == this.protstacksnref.shortname }
+                        odx.protStacks.firstOrNull { it.shortname == this.protstacksnref.shortname }
                             ?: error("Can't find protocol ${this.protstacksnref.shortname}")
 
                     protStackOdx.offset()
@@ -2564,7 +2559,7 @@ class DatabaseWriter(
     private fun SWITCHKEY.offset(): Int =
         cachedObjects.getOrPut(this) {
             val dop =
-                odx.combinedDataObjectProps[this.dataobjectpropref.idref]?.offset()
+                odx.resolveCombinedDop(this.dataobjectpropref)?.offset()
                     ?: error("Couldn't find dop-ref ${this.dataobjectpropref.idref}")
 
             SwitchKey.startSwitchKey(builder)
@@ -2581,8 +2576,8 @@ class DatabaseWriter(
             val structure =
                 this.structureref?.let {
                     val dop =
-                        odx.combinedDataObjectProps[it.idref]
-                            ?: error("Couldn't find dop-structure-ref ${this.structureref.idref}")
+                        odx.resolveCombinedDop(it)
+                            ?: error("Couldn't find dop-structure-ref ${it.idref}")
                     dop.offset()
                 }
 
@@ -2604,9 +2599,9 @@ class DatabaseWriter(
                 TODO("STRUCTURE shortnameref not supported for $this")
             }
             val structure =
-                this.structureref?.idref?.let {
-                    odx.combinedDataObjectProps[it]?.offset()
-                        ?: error("Couldn't find dop-structure-ref $it")
+                this.structureref?.let {
+                    odx.resolveCombinedDop(it)?.offset()
+                        ?: error("Couldn't find dop-structure-ref ${it.idref}")
                 }
 
             Case.startCase(builder)
@@ -2629,16 +2624,16 @@ class DatabaseWriter(
                 error("Unsupported data object prop shortname ref ${this.structuresnref}")
             }
             val dop =
-                this.dataobjectpropref?.idref?.let {
-                    val dop = odx.combinedDataObjectProps[it] ?: error("Couldn't find dop $it")
+                this.dataobjectpropref?.let {
+                    val dop = odx.resolveCombinedDop(it) ?: error("Couldn't find dop ${it.idref}")
                     dop.offset()
                 }
             this.structuresnref?.let {
                 error("Unsupported structure shortname ref ${this.structuresnref}")
             }
             val structure =
-                this.structureref?.idref?.let {
-                    val structureDop = odx.structures[it] ?: error("Couldn't find structure $it")
+                this.structureref?.let {
+                    val structureDop = odx.resolveStructure(it) ?: error("Couldn't find structure ${it.idref}")
                     structureDop.offset()
                 }
             val sdgs = this.sdgs?.offset()
@@ -2648,7 +2643,7 @@ class DatabaseWriter(
                     ?.functclassref
                     ?.map {
                         val functClass =
-                            odx.functClasses[it.idref]
+                            odx.resolveFunctClass(it)
                                 ?: error("Couldn't find funct class ${it.idref}")
                         functClass.offset()
                     }?.toIntArray()
@@ -2715,7 +2710,7 @@ class DatabaseWriter(
         val audiences =
             this.audience.enabledaudiencerefs.enabledaudienceref
                 .map {
-                    odx.additionalAudiences[it.idref] ?: error("Can't find additional audience ${it.idref}")
+                    odx.resolveAdditionalAudience(it) ?: error("Can't find additional audience ${it.idref}")
                 }.map {
                     it.shortname
                 }

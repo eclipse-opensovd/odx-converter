@@ -14,55 +14,41 @@
 import schema.odx.ADDITIONALAUDIENCE
 import schema.odx.BASEVARIANT
 import schema.odx.COMPARAM
+import schema.odx.COMPARAMREF
 import schema.odx.COMPARAMSPEC
 import schema.odx.COMPARAMSUBSET
 import schema.odx.COMPLEXCOMPARAM
-import schema.odx.DATAOBJECTPROP
-import schema.odx.DIAGCODEDTYPE
-import schema.odx.DIAGDATADICTIONARYSPEC
-import schema.odx.DIAGLAYERCONTAINER
 import schema.odx.DIAGSERVICE
 import schema.odx.DOPBASE
 import schema.odx.DTC
-import schema.odx.DTCDOP
-import schema.odx.DYNAMICENDMARKERFIELD
-import schema.odx.DYNAMICLENGTHFIELD
-import schema.odx.ECUSHAREDDATA
 import schema.odx.ECUVARIANT
-import schema.odx.ENDOFPDUFIELD
 import schema.odx.ENVDATA
-import schema.odx.ENVDATADESC
 import schema.odx.FUNCTCLASS
 import schema.odx.FUNCTIONALGROUP
-import schema.odx.GLOBALNEGRESPONSE
 import schema.odx.LENGTHKEY
 import schema.odx.LIBRARY
-import schema.odx.MUX
 import schema.odx.NEGRESPONSE
 import schema.odx.ODX
-import schema.odx.PARAM
+import schema.odx.ODXLINK
+import schema.odx.PARENTREF
 import schema.odx.PHYSICALDIMENSION
 import schema.odx.POSRESPONSE
+import schema.odx.PRECONDITIONSTATEREF
 import schema.odx.PROTOCOL
 import schema.odx.PROTSTACK
 import schema.odx.REQUEST
-import schema.odx.RESPONSE
-import schema.odx.SD
-import schema.odx.SDG
 import schema.odx.SDGCAPTION
-import schema.odx.SDGS
 import schema.odx.SINGLEECUJOB
 import schema.odx.STATE
-import schema.odx.STATECHART
 import schema.odx.STATETRANSITION
 import schema.odx.STATETRANSITIONREF
-import schema.odx.STATICFIELD
 import schema.odx.STRUCTURE
 import schema.odx.TABLE
 import schema.odx.TABLEKEY
 import schema.odx.TABLEROW
 import schema.odx.UNIT
-import schema.odx.UNITSPEC
+import java.util.IdentityHashMap
+import java.util.logging.Logger
 
 /**
  * Aggregates multiple [ODXCollection] instances (one per ODX file) and provides
@@ -71,12 +57,22 @@ import schema.odx.UNITSPEC
 class ODXCollectionGroup(
     val data: Map<String, ODX>,
     val rawSize: Long,
+    val options: ConverterOptions,
+    private val logger: Logger,
+    private val linkOwnership: IdentityHashMap<Any, String>,
 ) {
-    /** Individual per-file collections, keyed by the container short-name. */
+    // Individual per-file collections, keyed by the container short-name.
     val collections: Map<String, ODXCollection> by lazy {
         data.values
             .map { ODXCollection(it) }
             .associateBy { it.containerKey }
+    }
+
+    // Maps source filename to the ODXCollection created from that file.
+    private val fileToCollection: Map<String, ODXCollection> by lazy {
+        data.entries.associate { (filename, odx) ->
+            filename to collections.values.first { it.odx === odx }
+        }
     }
 
     val ecuName: String by lazy {
@@ -112,12 +108,6 @@ class ODXCollectionGroup(
                 ?.revisionlabel
     }
 
-    val diagLayerContainer: Map<String, DIAGLAYERCONTAINER> by lazy {
-        collections.values
-            .mapNotNull { it.diagLayerContainer }
-            .associateBy { it.id }
-    }
-
     val baseVariantODX: ODX? by lazy {
         data.values.firstOrNull { it.diaglayercontainer?.basevariants?.basevariant != null }
     }
@@ -131,203 +121,151 @@ class ODXCollectionGroup(
         }
     }
 
-    val ecuSharedDatas: Map<String, ECUSHAREDDATA> by lazy {
-        collections.values.flatMap { it.ecuSharedDatas.entries }.associate { it.toPair() }
+    val basevariants: List<BASEVARIANT> by lazy {
+        collections.values.flatMap { it.basevariants.values }
     }
 
-    val functClasses: Map<String, FUNCTCLASS> by lazy {
-        collections.values.flatMap { it.functClasses.entries }.associate { it.toPair() }
+    val ecuvariants: List<ECUVARIANT> by lazy {
+        collections.values.flatMap { it.ecuvariants.values }
     }
 
-    val basevariants: Map<String, BASEVARIANT> by lazy {
-        collections.values.flatMap { it.basevariants.entries }.associate { it.toPair() }
+    val functionalGroups: List<FUNCTIONALGROUP> by lazy {
+        collections.values.flatMap { it.functionalGroups.values }
     }
 
-    val ecuvariants: Map<String, ECUVARIANT> by lazy {
-        collections.values.flatMap { it.ecuvariants.entries }.associate { it.toPair() }
+    val diagServices: List<DIAGSERVICE> by lazy {
+        collections.values.flatMap { it.diagServices.values }
     }
 
-    val functionalGroups: Map<String, FUNCTIONALGROUP> by lazy {
-        collections.values.flatMap { it.functionalGroups.entries }.associate { it.toPair() }
+    val singleEcuJobs: List<SINGLEECUJOB> by lazy {
+        collections.values.flatMap { it.singleEcuJobs.values }
     }
 
-    val diagServices: Map<String, DIAGSERVICE> by lazy {
-        collections.values.flatMap { it.diagServices.entries }.associate { it.toPair() }
+    val dtcs: List<DTC> by lazy {
+        collections.values.flatMap { it.dtcs.values }
     }
 
-    val singleEcuJobs: Map<String, SINGLEECUJOB> by lazy {
-        collections.values.flatMap { it.singleEcuJobs.entries }.associate { it.toPair() }
+    val additionalAudiences: List<ADDITIONALAUDIENCE> by lazy {
+        collections.values.flatMap { it.additionalAudiences.values }
     }
 
-    val params: Set<PARAM> by lazy {
-        collections.values.flatMap { it.params }.toSet()
+    val protocols: List<PROTOCOL> by lazy {
+        collections.values.flatMap { it.protocols.values }
     }
 
-    val tableKeys: Map<String, TABLEKEY> by lazy {
-        collections.values.flatMap { it.tableKeys.entries }.associate { it.toPair() }
+    val comparamSpecs: List<COMPARAMSPEC> by lazy {
+        collections.values.flatMap { it.comparamSpecs.values }
     }
 
-    val lengthKeys: Map<String, LENGTHKEY> by lazy {
-        collections.values.flatMap { it.lengthKeys.entries }.associate { it.toPair() }
+    val protStacks: List<PROTSTACK> by lazy {
+        collections.values.flatMap { it.protStacks.values }
     }
 
-    val requests: Map<String, REQUEST> by lazy {
-        collections.values.flatMap { it.requests.entries }.associate { it.toPair() }
+    val libraries: List<LIBRARY> by lazy {
+        collections.values.flatMap { it.libraries.values }
     }
 
-    val responses: Set<RESPONSE> by lazy {
-        collections.values.flatMap { it.responses }.toSet()
+    // ODXLINK resolution methods
+
+    /**
+     * Looks up the [ODXCollection] that the given link object was parsed from,
+     * using the identity-based [linkOwnership] map.
+     */
+    private fun sourceCollectionFor(link: Any): ODXCollection? {
+        val filename = linkOwnership[link] ?: return null
+        return fileToCollection[filename]
     }
 
-    val posResponses: Map<String, POSRESPONSE> by lazy {
-        collections.values.flatMap { it.posResponses.entries }.associate { it.toPair() }
+    /**
+     * Scoped resolution helper. Uses the explicit docref if present, otherwise
+     * determines the source collection via [linkOwnership]. No global fallback.
+     */
+    private fun <T> resolveScoped(
+        link: Any,
+        idref: String,
+        docref: String?,
+        perFileAccessor: (ODXCollection) -> Map<String, T>,
+    ): T? {
+        val effectiveDocref = docref ?: sourceCollectionFor(link)?.containerKey
+        if (effectiveDocref != null) {
+            val collection = collections[effectiveDocref]
+            if (collection != null) {
+                return perFileAccessor(collection)[idref]
+            }
+        }
+        logger.warning("Could not resolve $idref: no docref and no source collection found")
+        return null
     }
 
-    val globalNegResponses: Map<String, GLOBALNEGRESPONSE> by lazy {
-        collections.values.flatMap { it.globalNegResponses.entries }.associate { it.toPair() }
-    }
+    fun resolveRequest(link: ODXLINK): REQUEST? = resolveScoped(link, link.idref, link.docref) { it.requests }
 
-    val negResponses: Map<String, NEGRESPONSE> by lazy {
-        collections.values.flatMap { it.negResponses.entries }.associate { it.toPair() }
-    }
+    fun resolvePosResponse(link: ODXLINK): POSRESPONSE? = resolveScoped(link, link.idref, link.docref) { it.posResponses }
 
-    val comparams: Map<String, COMPARAM> by lazy {
-        collections.values.flatMap { it.comparams.entries }.associate { it.toPair() }
-    }
+    fun resolveNegResponse(link: ODXLINK): NEGRESPONSE? = resolveScoped(link, link.idref, link.docref) { it.negResponses }
 
-    val complexComparams: Map<String, COMPLEXCOMPARAM> by lazy {
-        collections.values.flatMap { it.complexComparams.entries }.associate { it.toPair() }
-    }
+    fun resolveDiagService(link: ODXLINK): DIAGSERVICE? = resolveScoped(link, link.idref, link.docref) { it.diagServices }
 
-    val comParamSubSets: Map<String, COMPARAMSUBSET> by lazy {
-        collections.values.flatMap { it.comParamSubSets.entries }.associate { it.toPair() }
-    }
+    fun resolveSingleEcuJob(link: ODXLINK): SINGLEECUJOB? = resolveScoped(link, link.idref, link.docref) { it.singleEcuJobs }
 
-    val diagDataDictionaries: List<DIAGDATADICTIONARYSPEC> by lazy {
-        collections.values.flatMap { it.diagDataDictionaries }
-    }
+    fun resolveCombinedDop(link: ODXLINK): DOPBASE? = resolveScoped(link, link.idref, link.docref) { it.combinedDataObjectProps }
 
-    val diagCodedTypes: Set<DIAGCODEDTYPE> by lazy {
-        collections.values.flatMap { it.diagCodedTypes }.toSet()
-    }
+    fun resolveTable(link: ODXLINK): TABLE? = resolveScoped(link, link.idref, link.docref) { it.tables }
 
-    val combinedDataObjectProps: Map<String, DOPBASE> by lazy {
-        collections.values.flatMap { it.combinedDataObjectProps.entries }.associate { it.toPair() }
-    }
+    fun resolveTableRow(link: ODXLINK): TABLEROW? = resolveScoped(link, link.idref, link.docref) { it.tableRows }
 
-    val dataObjectProps: Map<String, DATAOBJECTPROP> by lazy {
-        collections.values.flatMap { it.dataObjectProps.entries }.associate { it.toPair() }
-    }
+    fun resolveTableKey(link: ODXLINK): TABLEKEY? = resolveScoped(link, link.idref, link.docref) { it.tableKeys }
 
-    val dtcDops: Map<String, DTCDOP> by lazy {
-        collections.values.flatMap { it.dtcDops.entries }.associate { it.toPair() }
-    }
+    fun resolveLengthKey(link: ODXLINK): LENGTHKEY? = resolveScoped(link, link.idref, link.docref) { it.lengthKeys }
 
-    val envDatas: Map<String, ENVDATA> by lazy {
-        collections.values.flatMap { it.envDatas.entries }.associate { it.toPair() }
-    }
+    fun resolveUnit(link: ODXLINK): UNIT? = resolveScoped(link, link.idref, link.docref) { it.units }
 
-    val envDataDescs: Map<String, ENVDATADESC> by lazy {
-        collections.values.flatMap { it.envDataDescs.entries }.associate { it.toPair() }
-    }
+    fun resolvePhysDimension(link: ODXLINK): PHYSICALDIMENSION? = resolveScoped(link, link.idref, link.docref) { it.physDimensions }
 
-    val structures: Map<String, STRUCTURE> by lazy {
-        collections.values.flatMap { it.structures.entries }.associate { it.toPair() }
-    }
+    fun resolveEnvData(link: ODXLINK): ENVDATA? = resolveScoped(link, link.idref, link.docref) { it.envDatas }
 
-    val tables: Map<String, TABLE> by lazy {
-        collections.values.flatMap { it.tables.entries }.associate { it.toPair() }
-    }
+    fun resolveLibrary(link: ODXLINK): LIBRARY? = resolveScoped(link, link.idref, link.docref) { it.libraries }
 
-    val tableRows: Map<String, TABLEROW> by lazy {
-        collections.values.flatMap { it.tableRows.entries }.associate { it.toPair() }
-    }
+    fun resolveDtc(link: ODXLINK): schema.odx.DTC? = resolveScoped(link, link.idref, link.docref) { it.dtcs }
 
-    val endofpdufields: Map<String, ENDOFPDUFIELD> by lazy {
-        collections.values.flatMap { it.endofpdufields.entries }.associate { it.toPair() }
-    }
+    fun resolveAdditionalAudience(link: ODXLINK): ADDITIONALAUDIENCE? =
+        resolveScoped(link, link.idref, link.docref) { it.additionalAudiences }
 
-    val staticfields: Map<String, STATICFIELD> by lazy {
-        collections.values.flatMap { it.staticfields.entries }.associate { it.toPair() }
-    }
+    fun resolveState(ref: PRECONDITIONSTATEREF): STATE? = resolveScoped(ref, ref.idref, ref.docref) { it.states }
 
-    val dynLengthFields: Map<String, DYNAMICLENGTHFIELD> by lazy {
-        collections.values.flatMap { it.dynLengthFields.entries }.associate { it.toPair() }
-    }
+    fun resolveStateTransition(ref: STATETRANSITIONREF): STATETRANSITION? =
+        resolveScoped(ref, ref.idref, ref.docref) { it.stateTransitions }
 
-    val dynEndMarkerFields: Map<String, DYNAMICENDMARKERFIELD> by lazy {
-        collections.values.flatMap { it.dynEndMarkerFields.entries }.associate { it.toPair() }
-    }
+    fun resolveFunctClass(link: ODXLINK): FUNCTCLASS? = resolveScoped(link, link.idref, link.docref) { it.functClasses }
 
-    val muxs: Map<String, MUX> by lazy {
-        collections.values.flatMap { it.muxs.entries }.associate { it.toPair() }
-    }
+    fun resolveComParamSpec(link: ODXLINK): COMPARAMSPEC? = resolveScoped(link, link.idref, link.docref) { it.comparamSpecs }
 
-    val units: Map<String, UNIT> by lazy {
-        collections.values.flatMap { it.units.entries }.associate { it.toPair() }
-    }
+    fun resolveComParamSubSet(link: ODXLINK): COMPARAMSUBSET? = resolveScoped(link, link.idref, link.docref) { it.comParamSubSets }
 
-    val sds: Set<SD> by lazy {
-        collections.values.flatMap { it.sds }.toSet()
-    }
+    fun resolveComparam(ref: COMPARAMREF): COMPARAM? = resolveScoped(ref, ref.idref, ref.docref) { it.comparams }
 
-    val sdgCaptions: Map<String, SDGCAPTION> by lazy {
-        collections.values.flatMap { it.sdgCaptions.entries }.associate { it.toPair() }
-    }
+    fun resolveComplexComparam(ref: COMPARAMREF): COMPLEXCOMPARAM? = resolveScoped(ref, ref.idref, ref.docref) { it.complexComparams }
 
-    val sdgs: Set<SDG> by lazy {
-        collections.values.flatMap { it.sdgs }.toSet()
-    }
+    fun resolveSdgCaption(link: ODXLINK): SDGCAPTION? = resolveScoped(link, link.idref, link.docref) { it.sdgCaptions }
 
-    val sdgss: List<SDGS> by lazy {
-        collections.values.flatMap { it.sdgss }
-    }
+    fun resolveStructure(link: ODXLINK): STRUCTURE? = resolveScoped(link, link.idref, link.docref) { it.structures }
 
-    val dtcs: Map<String, DTC> by lazy {
-        collections.values.flatMap { it.dtcs.entries }.associate { it.toPair() }
-    }
-
-    val additionalAudiences: Map<String, ADDITIONALAUDIENCE> by lazy {
-        collections.values.flatMap { it.additionalAudiences.entries }.associate { it.toPair() }
-    }
-
-    val stateCharts: Map<String, STATECHART> by lazy {
-        collections.values.flatMap { it.stateCharts.entries }.associate { it.toPair() }
-    }
-
-    val states: Map<String, STATE> by lazy {
-        collections.values.flatMap { it.states.entries }.associate { it.toPair() }
-    }
-
-    val stateTransitions: Map<String, STATETRANSITION> by lazy {
-        collections.values.flatMap { it.stateTransitions.entries }.associate { it.toPair() }
-    }
-
-    val stateTransitionsRefs: Set<STATETRANSITIONREF> by lazy {
-        collections.values.flatMap { it.stateTransitionsRefs }.toSet()
-    }
-
-    val unitSpecs: Set<UNITSPEC> by lazy {
-        collections.values.flatMap { it.unitSpecs }.toSet()
-    }
-
-    val protocols: Map<String, PROTOCOL> by lazy {
-        collections.values.flatMap { it.protocols.entries }.associate { it.toPair() }
-    }
-
-    val comparamSpecs: Map<String, COMPARAMSPEC> by lazy {
-        collections.values.flatMap { it.comparamSpecs.entries }.associate { it.toPair() }
-    }
-
-    val physDimensions: Map<String, PHYSICALDIMENSION> by lazy {
-        collections.values.flatMap { it.physDimensions.entries }.associate { it.toPair() }
-    }
-
-    val protStacks: Map<String, PROTSTACK> by lazy {
-        collections.values.flatMap { it.protStacks.entries }.associate { it.toPair() }
-    }
-
-    val libraries: Map<String, LIBRARY> by lazy {
-        collections.values.flatMap { it.libraries.entries }.associate { it.toPair() }
+    /**
+     * Resolves a PARENTREF by trying basevariants, ecuvariants, protocols,
+     * functionalGroups, tables, and ecuSharedDatas — scoped by docref when available.
+     */
+    fun resolveParent(ref: PARENTREF): Any? {
+        val effectiveDocref = ref.docref ?: sourceCollectionFor(ref)?.containerKey
+        if (effectiveDocref == null) {
+            logger.warning("Could not resolve parent ${ref.idref}: no docref and no source collection found")
+            return null
+        }
+        val collection = collections[effectiveDocref] ?: return null
+        collection.basevariants[ref.idref]?.let { return it }
+        collection.ecuvariants[ref.idref]?.let { return it }
+        collection.protocols[ref.idref]?.let { return it }
+        collection.functionalGroups[ref.idref]?.let { return it }
+        collection.tables[ref.idref]?.let { return it }
+        collection.ecuSharedDatas[ref.idref]?.let { return it }
+        return null
     }
 }

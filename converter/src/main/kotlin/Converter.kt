@@ -132,19 +132,21 @@ class FileConverter(
 
         val inputFileData = mutableMapOf<String, ZipEntryInfos>()
 
+        val linkCollector = ODXLinkCollector()
+
         ZipFile(inputFile).use { zipFile ->
             val readParseFileDuration =
                 measureTime {
-                    fillInputFileData(zipFile, odxData, inputFileData)
+                    fillInputFileData(zipFile, odxData, inputFileData, linkCollector)
                 }
             logger.fine("Reading and parsing into objects took $readParseFileDuration")
 
             val odxRawSize = inputFileData.filter { it.key.contains(".odx") }.map { it.value.size }.sum()
 
-            val odxCollection = ODXCollectionGroup(odxData, odxRawSize)
+            val odxCollection = ODXCollectionGroup(odxData, odxRawSize, options, logger, linkCollector.linkToFile)
 
             if (options.withAudiences.isNotEmpty()) {
-                val validAudiences = odxCollection.additionalAudiences.values.map { it.shortname }
+                val validAudiences = odxCollection.additionalAudiences.map { it.shortname }
                 val invalidAudiences =
                     options.withAudiences.filter { requested ->
                         validAudiences.none { it.equals(requested, ignoreCase = true) }
@@ -232,6 +234,7 @@ class FileConverter(
         zipFile: ZipFile,
         odxData: MutableMap<String, ODX>,
         inputFileData: MutableMap<String, ZipEntryInfos>,
+        linkCollector: ODXLinkCollector,
     ) {
         zipFile.entries().toList().forEach { entry ->
             if (entry.isDirectory) {
@@ -244,6 +247,7 @@ class FileConverter(
         }
 
         val unmarshaller = context.createUnmarshaller()
+        unmarshaller.listener = linkCollector
 
         var hadParseErrors = false
         // Output ODX validation errors to log file
@@ -265,6 +269,7 @@ class FileConverter(
             if (!entry.key.contains(".odx")) {
                 return@forEach
             }
+            linkCollector.currentFile = entry.key
             val odx =
                 entry.value.inputStream.invoke().use {
                     unmarshaller

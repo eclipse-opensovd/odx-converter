@@ -22,6 +22,7 @@ import schema.odx.COMPLEXCOMPARAM
 import schema.odx.DATAOBJECTPROP
 import schema.odx.DIAGCODEDTYPE
 import schema.odx.DIAGDATADICTIONARYSPEC
+import schema.odx.DIAGLAYER
 import schema.odx.DIAGLAYERCONTAINER
 import schema.odx.DIAGSERVICE
 import schema.odx.DOPBASE
@@ -112,102 +113,59 @@ class ODXCollection(
             .associateBy { it.id }
     }
 
+    val protocols: Map<String, PROTOCOL> by lazy {
+        (diagLayerContainer?.protocols?.protocol ?: emptyList())
+            .associateBy { it.id }
+    }
+
+    // All diag layers from this file, used for uniform extraction of child elements.
+    private val diagLayers: List<DIAGLAYER> by lazy {
+        basevariants.values + ecuvariants.values + functionalGroups.values +
+            ecuSharedDatas.values + protocols.values
+    }
+
     val functClasses: Map<String, FUNCTCLASS> by lazy {
-        val data =
-            basevariants.flatMap { it.value.functclasss?.functclass ?: emptyList() } +
-                ecuvariants.flatMap { it.value.functclasss?.functclass ?: emptyList() } +
-                ecuSharedDatas.flatMap { it.value.functclasss?.functclass ?: emptyList() }
-        data.associateBy { it.id }
+        diagLayers
+            .flatMap { it.functclasss?.functclass ?: emptyList() }
+            .associateBy { it.id }
     }
 
     val diagServices: Map<String, DIAGSERVICE> by lazy {
-        basevariants.values
+        diagLayers
             .flatMap { it.diagcomms?.diagcommproxy ?: emptyList() }
             .filterIsInstance<DIAGSERVICE>()
-            .associateBy { it.id } +
-            ecuvariants.values
-                .flatMap { it.diagcomms?.diagcommproxy ?: emptyList() }
-                .filterIsInstance<DIAGSERVICE>()
-                .associateBy { it.id } +
-            functionalGroups.values
-                .flatMap { it.diagcomms?.diagcommproxy ?: emptyList() }
-                .filterIsInstance<DIAGSERVICE>()
-                .associateBy { it.id }
+            .associateBy { it.id }
     }
 
     val singleEcuJobs: Map<String, SINGLEECUJOB> by lazy {
-        basevariants.values
+        diagLayers
             .flatMap { it.diagcomms?.diagcommproxy ?: emptyList() }
             .filterIsInstance<SINGLEECUJOB>()
-            .associateBy { it.id } +
-            ecuvariants.values
-                .flatMap { it.diagcomms?.diagcommproxy ?: emptyList() }
-                .filterIsInstance<SINGLEECUJOB>()
-                .associateBy { it.id } +
-            functionalGroups.values
-                .flatMap { it.diagcomms?.diagcommproxy ?: emptyList() }
-                .filterIsInstance<SINGLEECUJOB>()
-                .associateBy { it.id }
+            .associateBy { it.id }
     }
 
     val requests: Map<String, REQUEST> by lazy {
-        basevariants.values
+        diagLayers
             .flatMap { it.requests?.request ?: emptyList() }
-            .associateBy { it.id } +
-            ecuvariants.values
-                .flatMap { it.requests?.request ?: emptyList() }
-                .associateBy { it.id } +
-            functionalGroups.values
-                .flatMap { it.requests?.request ?: emptyList() }
-                .associateBy { it.id } +
-            ecuSharedDatas.values
-                .flatMap { it.requests?.request ?: emptyList() }
-                .associateBy { it.id }
+            .associateBy { it.id }
     }
 
     val posResponses: Map<String, POSRESPONSE> by lazy {
-        basevariants.values
+        diagLayers
             .flatMap { it.posresponses?.posresponse ?: emptyList() }
-            .associateBy { it.id } +
-            ecuvariants.values
-                .flatMap { it.posresponses?.posresponse ?: emptyList() }
-                .associateBy { it.id } +
-            functionalGroups.values
-                .flatMap { it.posresponses?.posresponse ?: emptyList() }
-                .associateBy { it.id } +
-            ecuSharedDatas.values
-                .flatMap { it.posresponses?.posresponse ?: emptyList() }
-                .associateBy { it.id }
+            .associateBy { it.id }
     }
 
     val globalNegResponses: Map<String, GLOBALNEGRESPONSE> by lazy {
-        basevariants.values
+        diagLayers
             .flatMap { it.globalnegresponses?.globalnegresponse ?: emptyList() }
-            .associateBy { it.id } +
-            ecuvariants.values
-                .flatMap { it.globalnegresponses?.globalnegresponse ?: emptyList() }
-                .associateBy { it.id } +
-            functionalGroups.values
-                .flatMap { it.globalnegresponses?.globalnegresponse ?: emptyList() }
-                .associateBy { it.id } +
-            ecuSharedDatas.values
-                .flatMap { it.globalnegresponses?.globalnegresponse ?: emptyList() }
-                .associateBy { it.id }
+            .associateBy { it.id }
     }
 
     val negResponses: Map<String, NEGRESPONSE> by lazy {
-        basevariants.values
+        diagLayers
             .flatMap { it.negresponses?.negresponse ?: emptyList() }
-            .associateBy { it.id } +
-            ecuvariants.values
-                .flatMap { it.negresponses?.negresponse ?: emptyList() }
-                .associateBy { it.id } +
-            functionalGroups.values
-                .flatMap { it.negresponses?.negresponse ?: emptyList() }
-                .associateBy { it.id } +
-            ecuSharedDatas.values
-                .flatMap { it.negresponses?.negresponse ?: emptyList() }
-                .associateBy { it.id }
+            .associateBy { it.id }
     }
 
     val responses: Set<RESPONSE> by lazy {
@@ -260,10 +218,7 @@ class ODXCollection(
     }
 
     val diagDataDictionaries: List<DIAGDATADICTIONARYSPEC> by lazy {
-        basevariants.values.mapNotNull { it.diagdatadictionaryspec } +
-            ecuvariants.values.mapNotNull { it.diagdatadictionaryspec } +
-            functionalGroups.values.mapNotNull { it.diagdatadictionaryspec } +
-            ecuSharedDatas.values.mapNotNull { it.diagdatadictionaryspec }
+        diagLayers.mapNotNull { it.diagdatadictionaryspec }
     }
 
     val diagCodedTypes: Set<DIAGCODEDTYPE> by lazy {
@@ -387,9 +342,7 @@ class ODXCollection(
                 diagServices.flatMap { listOf(it.value.sdgs) } +
                 singleEcuJobs.flatMap { listOf(it.value.sdgs) } +
                 listOfNotNull(diagLayerContainer).flatMap { listOf(it.sdgs) } +
-                basevariants.values.flatMap { listOf(it.sdgs) } +
-                ecuvariants.values.flatMap { listOf(it.sdgs) } +
-                functionalGroups.values.flatMap { listOf(it.sdgs) } +
+                diagLayers.flatMap { listOf(it.sdgs) } +
                 requests.values.flatMap { listOf(it.sdgs) } +
                 posResponses.values.flatMap { listOf(it.sdgs) } +
                 negResponses.values.flatMap { listOf(it.sdgs) } +
@@ -408,22 +361,15 @@ class ODXCollection(
     }
 
     val additionalAudiences: Map<String, ADDITIONALAUDIENCE> by lazy {
-        val data =
-            basevariants.values.flatMap { it.additionalaudiences?.additionalaudience ?: emptyList() } +
-                ecuvariants.values.flatMap { it.additionalaudiences?.additionalaudience ?: emptyList() } +
-                functionalGroups.values.flatMap { it.additionalaudiences?.additionalaudience ?: emptyList() } +
-                ecuSharedDatas.values.flatMap { it.additionalaudiences?.additionalaudience ?: emptyList() }
-
-        data.associateBy { it.id }
+        diagLayers
+            .flatMap { it.additionalaudiences?.additionalaudience ?: emptyList() }
+            .associateBy { it.id }
     }
 
     val stateCharts: Map<String, STATECHART> by lazy {
-        val data =
-            basevariants.values.flatMap { it.statecharts?.statechart ?: emptyList() } +
-                ecuvariants.values.flatMap { it.statecharts?.statechart ?: emptyList() } +
-                functionalGroups.values.flatMap { it.statecharts?.statechart ?: emptyList() } +
-                ecuSharedDatas.values.flatMap { it.statecharts?.statechart ?: emptyList() }
-        data.associateBy { it.id }
+        diagLayers
+            .flatMap { it.statecharts?.statechart ?: emptyList() }
+            .associateBy { it.id }
     }
 
     val states: Map<String, STATE> by lazy {
@@ -438,14 +384,10 @@ class ODXCollection(
 
     val stateTransitionsRefs: Set<STATETRANSITIONREF> by lazy {
         val data =
-            basevariants.values
+            diagLayers
                 .flatMap { it.diagcomms?.diagcommproxy ?: emptyList() }
                 .filterIsInstance<DIAGSERVICE>()
                 .flatMap { it.statetransitionrefs?.statetransitionref ?: emptyList() } +
-                ecuvariants.values
-                    .flatMap { it.diagcomms?.diagcommproxy ?: emptyList() }
-                    .filterIsInstance<DIAGSERVICE>()
-                    .flatMap { it.statetransitionrefs?.statetransitionref ?: emptyList() } +
                 tableRows.values.flatMap { it.statetransitionrefs?.statetransitionref ?: emptyList() }
 
         data.toSet()
@@ -457,12 +399,6 @@ class ODXCollection(
                 diagDataDictionaries.flatMap { listOf(it.unitspec) }
 
         data.filterNotNull().toSet()
-    }
-
-    val protocols: Map<String, PROTOCOL> by lazy {
-        listOfNotNull(diagLayerContainer)
-            .flatMap { it.protocols?.protocol ?: emptyList() }
-            .associateBy { it.id }
     }
 
     val comparamSpec: COMPARAMSPEC? by lazy {
@@ -486,11 +422,8 @@ class ODXCollection(
     }
 
     val libraries: Map<String, LIBRARY> by lazy {
-        val data =
-            basevariants.values.flatMap { it.librarys?.library ?: emptyList() } +
-                ecuvariants.values.flatMap { it.librarys?.library ?: emptyList() } +
-                functionalGroups.values.flatMap { it.librarys?.library ?: emptyList() }
-
-        data.associateBy { it.id }
+        diagLayers
+            .flatMap { it.librarys?.library ?: emptyList() }
+            .associateBy { it.id }
     }
 }
