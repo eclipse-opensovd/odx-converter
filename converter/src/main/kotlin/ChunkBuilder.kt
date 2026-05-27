@@ -28,10 +28,10 @@ class ChunkBuilder {
             return emptyList()
         }
         val jobFiles =
-            odx.singleEcuJobs.values
+            odx.singleEcuJobs
                 .flatMap { it.progcodes?.progcode ?: emptyList() }
                 .mapNotNull { it.codefile }
-        val libraries = odx.libraries.values.mapNotNull { it.codefile }
+        val libraries = odx.libraries.mapNotNull { it.codefile }
         val files = (jobFiles + libraries).toSet()
         return files.mapNotNull { fileName ->
             val data = inputData[fileName]
@@ -60,10 +60,10 @@ class ChunkBuilder {
         }
 
         val jobFiles =
-            odx.singleEcuJobs.values
+            odx.singleEcuJobs
                 .flatMap { it.progcodes?.progcode ?: emptyList() }
                 .mapNotNull { it.codefile }
-        val libraries = odx.libraries.values.mapNotNull { it.codefile }
+        val libraries = odx.libraries.mapNotNull { it.codefile }
         val files = (jobFiles + libraries).toSet()
         return files.flatMap { jobFileName ->
             options.partialJobFiles
