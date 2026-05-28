@@ -37,6 +37,9 @@ dependencyResolutionManagement {
             library("jaxb-impl", "com.sun.xml.bind:jaxb-impl:2.3.1")
             library("jaxb-core", "com.sun.xml.bind:jaxb-core:2.3.0.1")
             library("jaxb2-basics", "org.jvnet.jaxb2_commons:jaxb2-basics:1.11.1")
+
+            library("mockk", "io.mockk:mockk:1.13.16")
+            library("assertk", "com.willowtreeapps.assertk:assertk:0.28.1")
         }
     }
 }

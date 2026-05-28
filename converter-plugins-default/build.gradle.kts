@@ -7,6 +7,10 @@ dependencies {
 
     implementation(libs.apache.compress)
     implementation(libs.tukaani.xz)
+
+    testImplementation(kotlin("test"))
+    testImplementation(libs.mockk)
+    testImplementation(libs.assertk)
 }
 
 tasks.test {

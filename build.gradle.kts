@@ -21,6 +21,7 @@ plugins {
     kotlin("jvm") version libs.versions.kotlin
     id("com.github.jk1.dependency-license-report") version "2.9"
     id("org.jlleitschuh.gradle.ktlint") version "14.0.1"
+    jacoco
 }
 
 group = "org.eclipse.opensovd.cda.mdd"
@@ -40,6 +41,34 @@ allprojects {
         gradlePluginPortal()
     }
     plugins.apply("org.jlleitschuh.gradle.ktlint")
+}
+
+subprojects {
+    apply(plugin = "jacoco")
+
+    tasks.withType<Test> {
+        finalizedBy(tasks.withType<JacocoReport>())
+    }
+
+    tasks.withType<JacocoReport> {
+        dependsOn(tasks.withType<Test>())
+        reports {
+            xml.required.set(true)
+            html.required.set(true)
+        }
+    }
+
+    afterEvaluate {
+        tasks.withType<JacocoReport> {
+            classDirectories.setFrom(
+                classDirectories.files.map {
+                    fileTree(it) {
+                        exclude("schema/odx/**")
+                    }
+                }
+            )
+        }
+    }
 }
 
 ktlint {
