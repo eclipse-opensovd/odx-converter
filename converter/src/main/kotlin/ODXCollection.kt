@@ -426,4 +426,56 @@ class ODXCollection(
             .flatMap { it.librarys?.library ?: emptyList() }
             .associateBy { it.id }
     }
+
+    // Short-name indices for SNREF resolution
+
+    val dataObjectPropsByShortName: Map<String, DATAOBJECTPROP> by lazy {
+        dataObjectProps.values.associateBy { it.shortname }
+    }
+
+    val structuresByShortName: Map<String, STRUCTURE> by lazy {
+        structures.values.associateBy { it.shortname }
+    }
+
+    val envDataDescsByShortName: Map<String, ENVDATADESC> by lazy {
+        envDataDescs.values.associateBy { it.shortname }
+    }
+
+    val diagServicesByShortName: Map<String, DIAGSERVICE> by lazy {
+        diagServices.values.associateBy { it.shortname }
+    }
+
+    val singleEcuJobsByShortName: Map<String, SINGLEECUJOB> by lazy {
+        singleEcuJobs.values.associateBy { it.shortname }
+    }
+
+    val protocolsByShortName: Map<String, PROTOCOL> by lazy {
+        protocols.values.associateBy { it.shortname }
+    }
+
+    val protStacksByShortName: Map<String, PROTSTACK> by lazy {
+        protStacks.values.associateBy { it.shortname }
+    }
+
+    val tablesByShortName: Map<String, TABLE> by lazy {
+        tables.values.associateBy { it.shortname }
+    }
+
+    // Short-name resolution methods for SNREF support
+
+    fun resolveDopByShortName(shortName: String): DATAOBJECTPROP? = dataObjectPropsByShortName[shortName]
+
+    fun resolveStructureByShortName(shortName: String): STRUCTURE? = structuresByShortName[shortName]
+
+    fun resolveEnvDataDescByShortName(shortName: String): ENVDATADESC? = envDataDescsByShortName[shortName]
+
+    fun resolveDiagServiceByShortName(shortName: String): DIAGSERVICE? = diagServicesByShortName[shortName]
+
+    fun resolveSingleEcuJobByShortName(shortName: String): SINGLEECUJOB? = singleEcuJobsByShortName[shortName]
+
+    fun resolveProtocolByShortName(shortName: String): PROTOCOL? = protocolsByShortName[shortName]
+
+    fun resolveProtStackByShortName(shortName: String): PROTSTACK? = protStacksByShortName[shortName]
+
+    fun resolveTableByShortName(shortName: String): TABLE? = tablesByShortName[shortName]
 }

@@ -165,16 +165,24 @@ class ODXCollectionGroup(
         collections.values.flatMap { it.libraries.values }
     }
 
+    // Global short-name resolution for cross-file SNREF types (protocols, prot-stacks)
+
+    fun resolveProtocolByShortName(shortName: String): PROTOCOL? = protocols.firstOrNull { it.shortname == shortName }
+
+    fun resolveProtStackByShortName(shortName: String): PROTSTACK? = protStacks.firstOrNull { it.shortname == shortName }
+
     // ODXLINK resolution methods
 
     /**
      * Looks up the [ODXCollection] that the given link object was parsed from,
      * using the identity-based [linkOwnership] map.
      */
-    private fun sourceCollectionFor(link: Any): ODXCollection? {
-        val filename = linkOwnership[link] ?: return null
+    fun collectionFor(owner: Any): ODXCollection? {
+        val filename = linkOwnership[owner] ?: return null
         return fileToCollection[filename]
     }
+
+    private fun sourceCollectionFor(link: Any): ODXCollection? = collectionFor(link)
 
     /**
      * Scoped resolution helper. Uses the explicit docref if present, otherwise
