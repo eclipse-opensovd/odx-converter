@@ -12,17 +12,27 @@
  */
 
 import jakarta.xml.bind.Unmarshaller
+import schema.odx.CASE
 import schema.odx.COMPARAMREF
+import schema.odx.DIAGCOMM
+import schema.odx.ECUVARIANT
+import schema.odx.FIELD
+import schema.odx.MATCHINGBASEVARIANTPARAMETER
+import schema.odx.MATCHINGPARAMETER
 import schema.odx.ODXLINK
+import schema.odx.PARAM
 import schema.odx.PARENTREF
 import schema.odx.PRECONDITIONSTATEREF
 import schema.odx.STATETRANSITIONREF
+import schema.odx.TABLEDIAGCOMMCONNECTOR
+import schema.odx.TABLEROW
 import java.util.IdentityHashMap
 
 /**
  * JAXB [Unmarshaller.Listener] that records the source file for every ODXLINK-like
- * reference object encountered during unmarshalling. Set [currentFile] before
- * unmarshalling each file so that references are associated with the correct source.
+ * reference object and SNREF-containing object encountered during unmarshalling.
+ * Set [currentFile] before unmarshalling each file so that objects are associated
+ * with the correct source.
  */
 class ODXLinkCollector : Unmarshaller.Listener() {
     val linkToFile: IdentityHashMap<Any, String> = IdentityHashMap()
@@ -33,11 +43,22 @@ class ODXLinkCollector : Unmarshaller.Listener() {
         parent: Any?,
     ) {
         when (target) {
+            // ODXLINK reference types (for ID-based resolution)
             is ODXLINK,
             is PARENTREF,
             is COMPARAMREF,
             is PRECONDITIONSTATEREF,
             is STATETRANSITIONREF,
+            // SNREF-containing types (for short-name-based resolution)
+            is PARAM,
+            is FIELD,
+            is TABLEDIAGCOMMCONNECTOR,
+            is CASE,
+            is TABLEROW,
+            is MATCHINGBASEVARIANTPARAMETER,
+            is MATCHINGPARAMETER,
+            is DIAGCOMM,
+            is ECUVARIANT,
             -> linkToFile[target] = currentFile
         }
     }
