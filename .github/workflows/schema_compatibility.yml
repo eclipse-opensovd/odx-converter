@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: 2026 Contributors to the Eclipse Foundation
+#
+# SPDX-License-Identifier: Apache-2.0
+
+name: Schema Backward Compatibility
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'database/src/main/fbs/**'
+      - 'database/src/main/proto/**'
+
+permissions:
+  contents: read
+
+jobs:
+  flatbuffers-compat:
+    name: FlatBuffers Backward Compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install flatc v25.9.23
+        uses: Nugine/setup-flatc@v1
+        with:
+          version: "25.9.23"
+
+      - name: Check FlatBuffers schema backward compatibility
+        run: |
+          git show origin/main:database/src/main/fbs/diagnostic_description.fbs \
+            > /tmp/main_diagnostic_description.fbs
+          flatc --conform /tmp/main_diagnostic_description.fbs \
+            database/src/main/fbs/diagnostic_description.fbs
+
+  protobuf-compat:
+    name: Protobuf Backward Compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check Protobuf schema backward compatibility
+        uses: bufbuild/buf-action@v1
+        with:
+          input: database/src/main/proto
+          breaking_against: '.git#branch=origin/main,subdir=database/src/main/proto'
+          lint: false
+          format: false
+          push: false
+          pr_comment: false
