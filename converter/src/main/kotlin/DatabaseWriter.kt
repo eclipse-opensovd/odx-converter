@@ -756,7 +756,8 @@ class DatabaseWriter(
                         is TABLESTRUCT -> {
                             val tableKey =
                                 this.tablekeysnref?.shortname?.let { shortName ->
-                                    collectionOf(this).tableKeys.values
+                                    collectionOf(this)
+                                        .tableKeys.values
                                         .firstOrNull { it.shortname == shortName }
                                         ?.offset()
                                         ?: error("Couldn't find TABLE-KEY by short name: $shortName")
@@ -811,6 +812,19 @@ class DatabaseWriter(
                 throw IllegalStateException("Error in Param ${this.shortname}", e)
             }
         }
+
+    private fun resolveOrCreateFunctClass(link: ODXLINK): FUNCTCLASS {
+        odx.resolveFunctClass(link)?.let { return it }
+
+        if (!options.lenient) {
+            error("Couldn't find funct class ${link.idref}")
+        }
+        logger.warning("Couldn't find funct class ${link.idref}, creating stub")
+        return FUNCTCLASS().apply {
+            id = link.idref
+            shortname = link.idref
+        }
+    }
 
     private fun FUNCTCLASS.offset(): Int =
         cachedObjects.getOrPut(this) {
@@ -1685,10 +1699,7 @@ class DatabaseWriter(
             this.functclassrefs
                 ?.functclassref
                 ?.map {
-                    val functClass =
-                        odx.resolveFunctClass(it)
-                            ?: error("Couldn't find funct class ${it.idref}")
-                    functClass.offset()
+                    resolveOrCreateFunctClass(it).offset()
                 }?.toIntArray()
                 ?.let {
                     DiagComm.createFunctClassVector(builder, it)
@@ -2684,10 +2695,7 @@ class DatabaseWriter(
                 this.functclassrefs
                     ?.functclassref
                     ?.map {
-                        val functClass =
-                            odx.resolveFunctClass(it)
-                                ?: error("Couldn't find funct class ${it.idref}")
-                        functClass.offset()
+                        resolveOrCreateFunctClass(it).offset()
                     }?.toIntArray()
                     ?.let {
                         TableRow.createFunctClassRefsVector(builder, it)
