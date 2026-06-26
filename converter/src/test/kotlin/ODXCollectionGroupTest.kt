@@ -17,12 +17,9 @@ import assertk.assertions.isEqualTo
 import assertk.assertions.isNotNull
 import assertk.assertions.isNull
 import assertk.assertions.isSameInstanceAs
-import schema.odx.BASEVARIANTS
 import schema.odx.BASEVARIANT
-import schema.odx.DATAOBJECTPROP
-import schema.odx.DATAOBJECTPROPS
+import schema.odx.BASEVARIANTS
 import schema.odx.DIAGCOMMS
-import schema.odx.DIAGDATADICTIONARYSPEC
 import schema.odx.DIAGLAYERCONTAINER
 import schema.odx.DIAGSERVICE
 import schema.odx.ECUVARIANT
@@ -35,13 +32,11 @@ import schema.odx.PROTOCOL
 import schema.odx.PROTOCOLS
 import schema.odx.REQUEST
 import schema.odx.REQUESTS
-import schema.odx.SINGLEECUJOB
 import java.util.IdentityHashMap
 import java.util.logging.Logger
 import kotlin.test.Test
 
 class ODXCollectionGroupTest {
-
     private val logger = Logger.getLogger("test")
 
     private fun createOdxWithBaseVariant(
@@ -65,13 +60,14 @@ class ODXCollectionGroupTest {
     @Test
     fun `ecuName is derived from first base variant`() {
         val odx = createOdxWithBaseVariant("Container1", "bv1", "MyECU")
-        val group = ODXCollectionGroup(
-            data = mapOf("file1.odx" to odx),
-            rawSize = 100,
-            options = ConverterOptions(),
-            logger = logger,
-            linkOwnership = IdentityHashMap(),
-        )
+        val group =
+            ODXCollectionGroup(
+                data = mapOf("file1.odx" to odx),
+                rawSize = 100,
+                options = ConverterOptions(),
+                logger = logger,
+                linkOwnership = IdentityHashMap(),
+            )
         assertThat(group.ecuName).isEqualTo("MyECU")
     }
 
@@ -86,13 +82,14 @@ class ODXCollectionGroupTest {
         dlc.functionalgroups = FUNCTIONALGROUPS().apply { functionalgroup.add(fg) }
         odx.diaglayercontainer = dlc
 
-        val group = ODXCollectionGroup(
-            data = mapOf("file1.odx" to odx),
-            rawSize = 100,
-            options = ConverterOptions(),
-            logger = logger,
-            linkOwnership = IdentityHashMap(),
-        )
+        val group =
+            ODXCollectionGroup(
+                data = mapOf("file1.odx" to odx),
+                rawSize = 100,
+                options = ConverterOptions(),
+                logger = logger,
+                linkOwnership = IdentityHashMap(),
+            )
         assertThat(group.ecuName).isEqualTo("functional_groups")
     }
 
@@ -108,13 +105,14 @@ class ODXCollectionGroupTest {
         dlc2.ecuvariants = ECUVARIANTS().apply { ecuvariant.add(ev) }
         odx2.diaglayercontainer = dlc2
 
-        val group = ODXCollectionGroup(
-            data = mapOf("file1.odx" to odx1, "file2.odx" to odx2),
-            rawSize = 200,
-            options = ConverterOptions(),
-            logger = logger,
-            linkOwnership = IdentityHashMap(),
-        )
+        val group =
+            ODXCollectionGroup(
+                data = mapOf("file1.odx" to odx1, "file2.odx" to odx2),
+                rawSize = 200,
+                options = ConverterOptions(),
+                logger = logger,
+                linkOwnership = IdentityHashMap(),
+            )
         assertThat(group.collections).hasSize(2)
         assertThat(group.collections["Container1"]).isNotNull()
         assertThat(group.collections["Container2"]).isNotNull()
@@ -125,13 +123,14 @@ class ODXCollectionGroupTest {
         val odx1 = createOdxWithBaseVariant("Container1", "bv1", "ECU1")
         val odx2 = createOdxWithBaseVariant("Container2", "bv2", "ECU2")
 
-        val group = ODXCollectionGroup(
-            data = mapOf("file1.odx" to odx1, "file2.odx" to odx2),
-            rawSize = 200,
-            options = ConverterOptions(),
-            logger = logger,
-            linkOwnership = IdentityHashMap(),
-        )
+        val group =
+            ODXCollectionGroup(
+                data = mapOf("file1.odx" to odx1, "file2.odx" to odx2),
+                rawSize = 200,
+                options = ConverterOptions(),
+                logger = logger,
+                linkOwnership = IdentityHashMap(),
+            )
         assertThat(group.basevariants).hasSize(2)
     }
 
@@ -157,13 +156,14 @@ class ODXCollectionGroupTest {
         val linkOwnership = IdentityHashMap<Any, String>()
         linkOwnership[link] = "file1.odx"
 
-        val group = ODXCollectionGroup(
-            data = mapOf("file1.odx" to odx),
-            rawSize = 100,
-            options = ConverterOptions(),
-            logger = logger,
-            linkOwnership = linkOwnership,
-        )
+        val group =
+            ODXCollectionGroup(
+                data = mapOf("file1.odx" to odx),
+                rawSize = 100,
+                options = ConverterOptions(),
+                logger = logger,
+                linkOwnership = linkOwnership,
+            )
 
         val resolved = group.resolveRequest(link)
         assertThat(resolved).isSameInstanceAs(request)
@@ -189,13 +189,14 @@ class ODXCollectionGroupTest {
         link.idref = "req1"
         link.docref = "Container1"
 
-        val group = ODXCollectionGroup(
-            data = mapOf("file1.odx" to odx),
-            rawSize = 100,
-            options = ConverterOptions(),
-            logger = logger,
-            linkOwnership = IdentityHashMap(),
-        )
+        val group =
+            ODXCollectionGroup(
+                data = mapOf("file1.odx" to odx),
+                rawSize = 100,
+                options = ConverterOptions(),
+                logger = logger,
+                linkOwnership = IdentityHashMap(),
+            )
 
         val resolved = group.resolveRequest(link)
         assertThat(resolved).isSameInstanceAs(request)
@@ -209,13 +210,14 @@ class ODXCollectionGroupTest {
         link.idref = "nonexistent"
         link.docref = "Container1"
 
-        val group = ODXCollectionGroup(
-            data = mapOf("file1.odx" to odx),
-            rawSize = 100,
-            options = ConverterOptions(),
-            logger = logger,
-            linkOwnership = IdentityHashMap(),
-        )
+        val group =
+            ODXCollectionGroup(
+                data = mapOf("file1.odx" to odx),
+                rawSize = 100,
+                options = ConverterOptions(),
+                logger = logger,
+                linkOwnership = IdentityHashMap(),
+            )
 
         assertThat(group.resolveRequest(link)).isNull()
     }
@@ -241,9 +243,15 @@ class ODXCollectionGroupTest {
         val odx2 = ODX()
         val dlc2 = DIAGLAYERCONTAINER()
         dlc2.shortname = "Container2"
-        dlc2.ecuvariants = ECUVARIANTS().apply {
-            ecuvariant.add(ECUVARIANT().apply { id = "ev1"; shortname = "Var1" })
-        }
+        dlc2.ecuvariants =
+            ECUVARIANTS().apply {
+                ecuvariant.add(
+                    ECUVARIANT().apply {
+                        id = "ev1"
+                        shortname = "Var1"
+                    },
+                )
+            }
         odx2.diaglayercontainer = dlc2
 
         val link = ODXLINK()
@@ -253,13 +261,14 @@ class ODXCollectionGroupTest {
         val linkOwnership = IdentityHashMap<Any, String>()
         linkOwnership[link] = "file2.odx"
 
-        val group = ODXCollectionGroup(
-            data = mapOf("file1.odx" to odx1, "file2.odx" to odx2),
-            rawSize = 200,
-            options = ConverterOptions(),
-            logger = logger,
-            linkOwnership = linkOwnership,
-        )
+        val group =
+            ODXCollectionGroup(
+                data = mapOf("file1.odx" to odx1, "file2.odx" to odx2),
+                rawSize = 200,
+                options = ConverterOptions(),
+                logger = logger,
+                linkOwnership = linkOwnership,
+            )
 
         assertThat(group.resolveRequest(link)).isSameInstanceAs(request)
     }
@@ -272,13 +281,14 @@ class ODXCollectionGroupTest {
         val linkOwnership = IdentityHashMap<Any, String>()
         linkOwnership[link] = "file1.odx"
 
-        val group = ODXCollectionGroup(
-            data = mapOf("file1.odx" to odx),
-            rawSize = 100,
-            options = ConverterOptions(),
-            logger = logger,
-            linkOwnership = linkOwnership,
-        )
+        val group =
+            ODXCollectionGroup(
+                data = mapOf("file1.odx" to odx),
+                rawSize = 100,
+                options = ConverterOptions(),
+                logger = logger,
+                linkOwnership = linkOwnership,
+            )
 
         val collection = group.collectionFor(link)
         assertThat(collection).isNotNull()
@@ -289,13 +299,14 @@ class ODXCollectionGroupTest {
     fun `collectionFor returns null for untracked object`() {
         val odx = createOdxWithBaseVariant("Container1", "bv1", "ECU1")
 
-        val group = ODXCollectionGroup(
-            data = mapOf("file1.odx" to odx),
-            rawSize = 100,
-            options = ConverterOptions(),
-            logger = logger,
-            linkOwnership = IdentityHashMap(),
-        )
+        val group =
+            ODXCollectionGroup(
+                data = mapOf("file1.odx" to odx),
+                rawSize = 100,
+                options = ConverterOptions(),
+                logger = logger,
+                linkOwnership = IdentityHashMap(),
+            )
 
         assertThat(group.collectionFor("untracked")).isNull()
     }
@@ -310,35 +321,44 @@ class ODXCollectionGroupTest {
         service2.id = "ds2"
         service2.shortname = "Service2"
 
-        val bv1 = BASEVARIANT().apply {
-            id = "bv1"; shortname = "ECU1"
-            diagcomms = DIAGCOMMS().apply { diagcommproxy.add(service1) }
-        }
-        val bv2 = BASEVARIANT().apply {
-            id = "bv2"; shortname = "ECU2"
-            diagcomms = DIAGCOMMS().apply { diagcommproxy.add(service2) }
-        }
-
-        val odx1 = ODX().apply {
-            diaglayercontainer = DIAGLAYERCONTAINER().apply {
-                shortname = "Container1"
-                basevariants = BASEVARIANTS().apply { basevariant.add(bv1) }
+        val bv1 =
+            BASEVARIANT().apply {
+                id = "bv1"
+                shortname = "ECU1"
+                diagcomms = DIAGCOMMS().apply { diagcommproxy.add(service1) }
             }
-        }
-        val odx2 = ODX().apply {
-            diaglayercontainer = DIAGLAYERCONTAINER().apply {
-                shortname = "Container2"
-                basevariants = BASEVARIANTS().apply { basevariant.add(bv2) }
+        val bv2 =
+            BASEVARIANT().apply {
+                id = "bv2"
+                shortname = "ECU2"
+                diagcomms = DIAGCOMMS().apply { diagcommproxy.add(service2) }
             }
-        }
 
-        val group = ODXCollectionGroup(
-            data = mapOf("file1.odx" to odx1, "file2.odx" to odx2),
-            rawSize = 200,
-            options = ConverterOptions(),
-            logger = logger,
-            linkOwnership = IdentityHashMap(),
-        )
+        val odx1 =
+            ODX().apply {
+                diaglayercontainer =
+                    DIAGLAYERCONTAINER().apply {
+                        shortname = "Container1"
+                        basevariants = BASEVARIANTS().apply { basevariant.add(bv1) }
+                    }
+            }
+        val odx2 =
+            ODX().apply {
+                diaglayercontainer =
+                    DIAGLAYERCONTAINER().apply {
+                        shortname = "Container2"
+                        basevariants = BASEVARIANTS().apply { basevariant.add(bv2) }
+                    }
+            }
+
+        val group =
+            ODXCollectionGroup(
+                data = mapOf("file1.odx" to odx1, "file2.odx" to odx2),
+                rawSize = 200,
+                options = ConverterOptions(),
+                logger = logger,
+                linkOwnership = IdentityHashMap(),
+            )
 
         assertThat(group.diagServices).hasSize(2)
     }
@@ -349,20 +369,23 @@ class ODXCollectionGroupTest {
         protocol.id = "proto1"
         protocol.shortname = "UDS"
 
-        val odx = ODX().apply {
-            diaglayercontainer = DIAGLAYERCONTAINER().apply {
-                shortname = "Container1"
-                protocols = PROTOCOLS().apply { this.protocol.add(protocol) }
+        val odx =
+            ODX().apply {
+                diaglayercontainer =
+                    DIAGLAYERCONTAINER().apply {
+                        shortname = "Container1"
+                        protocols = PROTOCOLS().apply { this.protocol.add(protocol) }
+                    }
             }
-        }
 
-        val group = ODXCollectionGroup(
-            data = mapOf("file1.odx" to odx),
-            rawSize = 100,
-            options = ConverterOptions(),
-            logger = logger,
-            linkOwnership = IdentityHashMap(),
-        )
+        val group =
+            ODXCollectionGroup(
+                data = mapOf("file1.odx" to odx),
+                rawSize = 100,
+                options = ConverterOptions(),
+                logger = logger,
+                linkOwnership = IdentityHashMap(),
+            )
 
         assertThat(group.resolveProtocolByShortName("UDS")).isSameInstanceAs(protocol)
         assertThat(group.resolveProtocolByShortName("NonExistent")).isNull()

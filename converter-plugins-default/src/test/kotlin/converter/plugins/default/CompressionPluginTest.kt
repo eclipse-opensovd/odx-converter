@@ -30,7 +30,6 @@ import java.util.logging.Logger
 import kotlin.test.Test
 
 class CompressionPluginTest {
-
     private val plugin = CompressionPlugin()
 
     @Test
@@ -66,9 +65,10 @@ class CompressionPluginTest {
 
         // Verify data is actually LZMA compressed by decompressing it
         val compressedData = chunkBuilder.data.toByteArray()
-        val decompressed = LZMACompressorInputStream(ByteArrayInputStream(compressedData)).use {
-            it.readAllBytes()
-        }
+        val decompressed =
+            LZMACompressorInputStream(ByteArrayInputStream(compressedData)).use {
+                it.readAllBytes()
+            }
         assertThat(decompressed.toList()).isEqualTo(testData.toList())
 
         // Verify SHA-512 signature is added
@@ -97,9 +97,10 @@ class CompressionPluginTest {
 
         // Verify the chunk data was used (not initialData) by decompressing
         val compressedData = chunkBuilder.data.toByteArray()
-        val decompressed = LZMACompressorInputStream(ByteArrayInputStream(compressedData)).use {
-            it.readAllBytes()
-        }
+        val decompressed =
+            LZMACompressorInputStream(ByteArrayInputStream(compressedData)).use {
+                it.readAllBytes()
+            }
         assertThat(decompressed.toList()).isEqualTo(chunkData.toList())
     }
 

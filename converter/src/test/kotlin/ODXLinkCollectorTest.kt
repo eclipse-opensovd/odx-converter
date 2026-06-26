@@ -15,6 +15,7 @@ import assertk.assertThat
 import assertk.assertions.doesNotContainKey
 import assertk.assertions.hasSize
 import assertk.assertions.isEqualTo
+import schema.odx.BASEVARIANTREF
 import schema.odx.CASE
 import schema.odx.CODEDCONST
 import schema.odx.COMPARAMREF
@@ -24,7 +25,6 @@ import schema.odx.ENDOFPDUFIELD
 import schema.odx.MATCHINGBASEVARIANTPARAMETER
 import schema.odx.MATCHINGPARAMETER
 import schema.odx.ODXLINK
-import schema.odx.BASEVARIANTREF
 import schema.odx.PRECONDITIONSTATEREF
 import schema.odx.SINGLEECUJOB
 import schema.odx.STATETRANSITIONREF
@@ -34,7 +34,6 @@ import schema.odx.VALUE
 import kotlin.test.Test
 
 class ODXLinkCollectorTest {
-
     @Test
     fun `ODXLINK is tracked`() {
         val collector = ODXLinkCollector()

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Synthetic ODX file for integration testing.
+  Contains a COMPARAM-SUBSET with communication parameters.
+-->
+<ODX MODEL-VERSION="2.2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <COMPARAM-SUBSET ID="cps_can_params" CATEGORY="BUSTYPE">
+    <SHORT-NAME>CANParameters</SHORT-NAME>
+    <LONG-NAME>CAN Communication Parameters</LONG-NAME>
+    <COMPARAMS>
+      <COMPARAM ID="cp_timeout" PARAM-CLASS="TIMING" CPTYPE="STANDARD" CPUSAGE="ECU-COMM">
+        <SHORT-NAME>CP_Timeout</SHORT-NAME>
+        <PHYSICAL-DEFAULT-VALUE>5000</PHYSICAL-DEFAULT-VALUE>
+        <DATA-OBJECT-PROP-REF ID-REF="dop_cp_uint16"/>
+      </COMPARAM>
+      <COMPARAM ID="cp_baudrate" PARAM-CLASS="BUSTYPE" CPTYPE="STANDARD" CPUSAGE="ECU-COMM">
+        <SHORT-NAME>CP_BaudRate</SHORT-NAME>
+        <PHYSICAL-DEFAULT-VALUE>500000</PHYSICAL-DEFAULT-VALUE>
+        <DATA-OBJECT-PROP-REF ID-REF="dop_cp_uint16"/>
+      </COMPARAM>
+    </COMPARAMS>
+    <COMPLEX-COMPARAMS>
+      <COMPLEX-COMPARAM ID="ccp_timing" PARAM-CLASS="TIMING" CPTYPE="STANDARD" CPUSAGE="ECU-COMM" ALLOW-MULTIPLE-VALUES="false">
+        <SHORT-NAME>CCP_TimingParams</SHORT-NAME>
+        <COMPARAM ID="cp_p2_timeout" PARAM-CLASS="TIMING" CPTYPE="STANDARD" CPUSAGE="ECU-COMM">
+          <SHORT-NAME>CP_P2Timeout</SHORT-NAME>
+          <PHYSICAL-DEFAULT-VALUE>50</PHYSICAL-DEFAULT-VALUE>
+          <DATA-OBJECT-PROP-REF ID-REF="dop_cp_uint16"/>
+        </COMPARAM>
+        <COMPLEX-PHYSICAL-DEFAULT-VALUE>
+          <COMPLEX-VALUES>
+            <COMPLEX-VALUE>
+              <SIMPLE-VALUE>50</SIMPLE-VALUE>
+            </COMPLEX-VALUE>
+          </COMPLEX-VALUES>
+        </COMPLEX-PHYSICAL-DEFAULT-VALUE>
+      </COMPLEX-COMPARAM>
+    </COMPLEX-COMPARAMS>
+    <DATA-OBJECT-PROPS>
+      <DATA-OBJECT-PROP ID="dop_cp_uint16">
+        <SHORT-NAME>DOP_CP_UInt16</SHORT-NAME>
+        <COMPU-METHOD>
+          <CATEGORY>IDENTICAL</CATEGORY>
+        </COMPU-METHOD>
+        <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+          <BIT-LENGTH>16</BIT-LENGTH>
+        </DIAG-CODED-TYPE>
+        <PHYSICAL-TYPE BASE-DATA-TYPE="A_UINT32"/>
+        <UNIT-REF ID-REF="unit_ms"/>
+      </DATA-OBJECT-PROP>
+    </DATA-OBJECT-PROPS>
+    <UNIT-SPEC>
+      <UNIT-GROUPS>
+        <UNIT-GROUP>
+          <SHORT-NAME>TimeUnits</SHORT-NAME>
+          <CATEGORY>EQUIV-UNITS</CATEGORY>
+          <UNIT-REFS>
+            <UNIT-REF ID-REF="unit_ms"/>
+          </UNIT-REFS>
+        </UNIT-GROUP>
+      </UNIT-GROUPS>
+      <UNITS>
+        <UNIT ID="unit_ms">
+          <SHORT-NAME>Milliseconds</SHORT-NAME>
+          <DISPLAY-NAME>ms</DISPLAY-NAME>
+          <FACTOR-SI-TO-UNIT>1000</FACTOR-SI-TO-UNIT>
+          <PHYSICAL-DIMENSION-REF ID-REF="pd_time"/>
+        </UNIT>
+        <UNIT ID="unit_bps">
+          <SHORT-NAME>BitsPerSecond</SHORT-NAME>
+          <DISPLAY-NAME>bps</DISPLAY-NAME>
+        </UNIT>
+      </UNITS>
+      <PHYSICAL-DIMENSIONS>
+        <PHYSICAL-DIMENSION ID="pd_time">
+          <SHORT-NAME>Time</SHORT-NAME>
+          <TIME-EXP>1</TIME-EXP>
+        </PHYSICAL-DIMENSION>
+      </PHYSICAL-DIMENSIONS>
+    </UNIT-SPEC>
+  </COMPARAM-SUBSET>
+</ODX>

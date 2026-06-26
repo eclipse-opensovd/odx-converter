@@ -17,11 +17,10 @@ import assertk.assertions.isSameInstanceAs
 import assertk.assertions.isTrue
 import org.eclipse.opensovd.cda.mdd.Chunk
 import org.eclipse.opensovd.cda.mdd.MDDFile
-import kotlin.test.Test
 import java.util.logging.Logger
+import kotlin.test.Test
 
 class ChunkApiHandlerTest {
-
     @Test
     fun `removeChunk is false by default`() {
         val handler = ChunkApiHandler(Chunk.newBuilder())
@@ -53,7 +52,6 @@ class ChunkApiHandlerTest {
 }
 
 class PluginApiHandlerTest {
-
     @Test
     fun `mddFile returns the provided builder`() {
         val mddBuilder = MDDFile.newBuilder()
@@ -76,10 +74,11 @@ class PluginApiHandlerTest {
         val logger = Logger.getLogger("test")
         var capturedChunk: Chunk.Builder? = null
         var capturedHandler: PluginApiHandler? = null
-        val handler = PluginApiHandler(mddBuilder, logger) { chunk, api ->
-            capturedChunk = chunk
-            capturedHandler = api
-        }
+        val handler =
+            PluginApiHandler(mddBuilder, logger) { chunk, api ->
+                capturedChunk = chunk
+                capturedHandler = api
+            }
         val chunkBuilder = Chunk.newBuilder()
         handler.addChunk(chunkBuilder)
         assertThat(capturedChunk).isSameInstanceAs(chunkBuilder)

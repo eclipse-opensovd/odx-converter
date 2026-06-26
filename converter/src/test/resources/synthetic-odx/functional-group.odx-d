@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Synthetic ODX file for integration testing.
+  Contains a FUNCTIONAL-GROUP with a shared diagnostic service.
+-->
+<ODX MODEL-VERSION="2.2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <DIAG-LAYER-CONTAINER ID="dlc_func_group">
+    <SHORT-NAME>FuncGroupContainer</SHORT-NAME>
+    <FUNCTIONAL-GROUPS>
+      <FUNCTIONAL-GROUP ID="fg_shared_diag">
+        <SHORT-NAME>SharedDiagnostics</SHORT-NAME>
+        <LONG-NAME>Shared Diagnostic Functions</LONG-NAME>
+
+        <DIAG-DATA-DICTIONARY-SPEC>
+          <DATA-OBJECT-PROPS>
+            <DATA-OBJECT-PROP ID="dop_fg_uint8">
+              <SHORT-NAME>DOP_FG_UInt8</SHORT-NAME>
+              <COMPU-METHOD>
+                <CATEGORY>IDENTICAL</CATEGORY>
+              </COMPU-METHOD>
+              <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                <BIT-LENGTH>8</BIT-LENGTH>
+              </DIAG-CODED-TYPE>
+              <PHYSICAL-TYPE BASE-DATA-TYPE="A_UINT32"/>
+            </DATA-OBJECT-PROP>
+          </DATA-OBJECT-PROPS>
+        </DIAG-DATA-DICTIONARY-SPEC>
+
+        <DIAG-COMMS>
+          <DIAG-SERVICE ID="ds_tester_present" SEMANTIC="SESSION" ADDRESSING="FUNCTIONAL" TRANSMISSION-MODE="SEND-AND-RECEIVE">
+            <SHORT-NAME>TesterPresent</SHORT-NAME>
+            <LONG-NAME>Tester Present</LONG-NAME>
+            <REQUEST-REF ID-REF="req_tester_present"/>
+            <POS-RESPONSE-REFS>
+              <POS-RESPONSE-REF ID-REF="pr_tester_present"/>
+            </POS-RESPONSE-REFS>
+          </DIAG-SERVICE>
+        </DIAG-COMMS>
+
+        <REQUESTS>
+          <REQUEST ID="req_tester_present">
+            <SHORT-NAME>RQ_TesterPresent</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>62</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SUBFUNCTION">
+                <SHORT-NAME>SubFunction</SHORT-NAME>
+                <BYTE-POSITION>1</BYTE-POSITION>
+                <CODED-VALUE>0</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+            </PARAMS>
+          </REQUEST>
+        </REQUESTS>
+
+        <POS-RESPONSES>
+          <POS-RESPONSE ID="pr_tester_present">
+            <SHORT-NAME>PR_TesterPresent</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>126</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SUBFUNCTION">
+                <SHORT-NAME>SubFunction</SHORT-NAME>
+                <BYTE-POSITION>1</BYTE-POSITION>
+                <CODED-VALUE>0</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+            </PARAMS>
+          </POS-RESPONSE>
+        </POS-RESPONSES>
+
+        <!-- Parent ref to base variant for inheritance -->
+        <PARENT-REFS>
+          <PARENT-REF xsi:type="BASE-VARIANT-REF" ID-REF="bv_synth_ecu" DOCREF="BaseContainer" DOCTYPE="LAYER"/>
+        </PARENT-REFS>
+
+      </FUNCTIONAL-GROUP>
+    </FUNCTIONAL-GROUPS>
+  </DIAG-LAYER-CONTAINER>
+</ODX>

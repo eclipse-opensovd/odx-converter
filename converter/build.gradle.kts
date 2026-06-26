@@ -58,6 +58,8 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation(libs.mockk)
     testImplementation(libs.assertk)
+    testImplementation(libs.apache.compress)
+    testImplementation(libs.tukaani.xz)
 }
 
 tasks.test {

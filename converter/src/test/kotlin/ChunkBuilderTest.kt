@@ -15,7 +15,6 @@ import assertk.assertThat
 import assertk.assertions.hasSize
 import assertk.assertions.isEmpty
 import assertk.assertions.isEqualTo
-import assertk.assertions.isNotNull
 import io.mockk.every
 import io.mockk.mockk
 import org.eclipse.opensovd.cda.mdd.Chunk
@@ -24,12 +23,10 @@ import schema.odx.PROGCODE
 import schema.odx.PROGCODES
 import schema.odx.SINGLEECUJOB
 import java.io.ByteArrayInputStream
-import java.io.InputStream
 import java.util.logging.Logger
 import kotlin.test.Test
 
 class ChunkBuilderTest {
-
     private val logger = Logger.getLogger("test")
 
     @Test
@@ -62,12 +59,14 @@ class ChunkBuilderTest {
         every { odx.libraries } returns emptyList()
 
         val fileContent = "binary data".toByteArray()
-        val inputData = mapOf(
-            "job.jar" to ZipEntryInfos(
-                size = fileContent.size.toLong(),
-                inputStream = { ByteArrayInputStream(fileContent) },
-            ),
-        )
+        val inputData =
+            mapOf(
+                "job.jar" to
+                    ZipEntryInfos(
+                        size = fileContent.size.toLong(),
+                        inputStream = { ByteArrayInputStream(fileContent) },
+                    ),
+            )
 
         val result = builder.createJobsChunks(logger, inputData, odx, options)
         assertThat(result).hasSize(1)
@@ -92,12 +91,14 @@ class ChunkBuilderTest {
         every { odx.libraries } returns listOf(library)
 
         val fileContent = "lib data".toByteArray()
-        val inputData = mapOf(
-            "lib.jar" to ZipEntryInfos(
-                size = fileContent.size.toLong(),
-                inputStream = { ByteArrayInputStream(fileContent) },
-            ),
-        )
+        val inputData =
+            mapOf(
+                "lib.jar" to
+                    ZipEntryInfos(
+                        size = fileContent.size.toLong(),
+                        inputStream = { ByteArrayInputStream(fileContent) },
+                    ),
+            )
 
         val result = builder.createJobsChunks(logger, inputData, odx, options)
         assertThat(result).hasSize(1)
@@ -111,26 +112,32 @@ class ChunkBuilderTest {
 
         val progCode1 = PROGCODE().apply { codefile = "shared.jar" }
         val progCode2 = PROGCODE().apply { codefile = "shared.jar" }
-        val job1 = SINGLEECUJOB().apply {
-            id = "job1"; shortname = "Job1"
-            progcodes = PROGCODES().apply { progcode.add(progCode1) }
-        }
-        val job2 = SINGLEECUJOB().apply {
-            id = "job2"; shortname = "Job2"
-            progcodes = PROGCODES().apply { progcode.add(progCode2) }
-        }
+        val job1 =
+            SINGLEECUJOB().apply {
+                id = "job1"
+                shortname = "Job1"
+                progcodes = PROGCODES().apply { progcode.add(progCode1) }
+            }
+        val job2 =
+            SINGLEECUJOB().apply {
+                id = "job2"
+                shortname = "Job2"
+                progcodes = PROGCODES().apply { progcode.add(progCode2) }
+            }
 
         val odx = mockk<ODXCollectionGroup>()
         every { odx.singleEcuJobs } returns listOf(job1, job2)
         every { odx.libraries } returns emptyList()
 
         val fileContent = "shared data".toByteArray()
-        val inputData = mapOf(
-            "shared.jar" to ZipEntryInfos(
-                size = fileContent.size.toLong(),
-                inputStream = { ByteArrayInputStream(fileContent) },
-            ),
-        )
+        val inputData =
+            mapOf(
+                "shared.jar" to
+                    ZipEntryInfos(
+                        size = fileContent.size.toLong(),
+                        inputStream = { ByteArrayInputStream(fileContent) },
+                    ),
+            )
 
         val result = builder.createJobsChunks(logger, inputData, odx, options)
         assertThat(result).hasSize(1)

@@ -65,7 +65,7 @@ subprojects {
                     fileTree(it) {
                         exclude("schema/odx/**")
                     }
-                }
+                },
             )
         }
     }

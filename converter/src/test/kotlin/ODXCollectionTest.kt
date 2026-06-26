@@ -12,23 +12,21 @@
  */
 
 import assertk.assertThat
-import assertk.assertions.containsExactly
 import assertk.assertions.hasSize
 import assertk.assertions.isEmpty
 import assertk.assertions.isEqualTo
-import assertk.assertions.isNotNull
 import assertk.assertions.isNull
 import assertk.assertions.isSameInstanceAs
-import schema.odx.BASEVARIANTS
 import schema.odx.BASEVARIANT
+import schema.odx.BASEVARIANTS
 import schema.odx.DATAOBJECTPROP
 import schema.odx.DATAOBJECTPROPS
 import schema.odx.DIAGCOMMS
 import schema.odx.DIAGDATADICTIONARYSPEC
 import schema.odx.DIAGLAYERCONTAINER
 import schema.odx.DIAGSERVICE
-import schema.odx.ECUSHAREDDATAS
 import schema.odx.ECUSHAREDDATA
+import schema.odx.ECUSHAREDDATAS
 import schema.odx.ECUVARIANT
 import schema.odx.ECUVARIANTS
 import schema.odx.FUNCTIONALGROUP
@@ -45,7 +43,6 @@ import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
 class ODXCollectionTest {
-
     private fun createOdxWithDiagLayerContainer(block: DIAGLAYERCONTAINER.() -> Unit): ODX {
         val odx = ODX()
         val dlc = DIAGLAYERCONTAINER()
@@ -88,9 +85,10 @@ class ODXCollectionTest {
         bv.id = "bv1"
         bv.shortname = "BaseVar1"
 
-        val odx = createOdxWithDiagLayerContainer {
-            basevariants = BASEVARIANTS().apply { basevariant.add(bv) }
-        }
+        val odx =
+            createOdxWithDiagLayerContainer {
+                basevariants = BASEVARIANTS().apply { basevariant.add(bv) }
+            }
 
         val collection = ODXCollection(odx)
         assertThat(collection.basevariants).hasSize(1)
@@ -103,9 +101,10 @@ class ODXCollectionTest {
         ev.id = "ev1"
         ev.shortname = "EcuVar1"
 
-        val odx = createOdxWithDiagLayerContainer {
-            ecuvariants = ECUVARIANTS().apply { ecuvariant.add(ev) }
-        }
+        val odx =
+            createOdxWithDiagLayerContainer {
+                ecuvariants = ECUVARIANTS().apply { ecuvariant.add(ev) }
+            }
 
         val collection = ODXCollection(odx)
         assertThat(collection.ecuvariants).hasSize(1)
@@ -123,9 +122,10 @@ class ODXCollectionTest {
         bv.shortname = "BaseVar1"
         bv.diagcomms = DIAGCOMMS().apply { diagcommproxy.add(service) }
 
-        val odx = createOdxWithDiagLayerContainer {
-            basevariants = BASEVARIANTS().apply { basevariant.add(bv) }
-        }
+        val odx =
+            createOdxWithDiagLayerContainer {
+                basevariants = BASEVARIANTS().apply { basevariant.add(bv) }
+            }
 
         val collection = ODXCollection(odx)
         assertThat(collection.diagServices).hasSize(1)
@@ -143,9 +143,10 @@ class ODXCollectionTest {
         bv.shortname = "BaseVar1"
         bv.diagcomms = DIAGCOMMS().apply { diagcommproxy.add(job) }
 
-        val odx = createOdxWithDiagLayerContainer {
-            basevariants = BASEVARIANTS().apply { basevariant.add(bv) }
-        }
+        val odx =
+            createOdxWithDiagLayerContainer {
+                basevariants = BASEVARIANTS().apply { basevariant.add(bv) }
+            }
 
         val collection = ODXCollection(odx)
         assertThat(collection.singleEcuJobs).hasSize(1)
@@ -162,9 +163,10 @@ class ODXCollectionTest {
         bv.shortname = "BaseVar1"
         bv.requests = REQUESTS().apply { this.request.add(request) }
 
-        val odx = createOdxWithDiagLayerContainer {
-            basevariants = BASEVARIANTS().apply { basevariant.add(bv) }
-        }
+        val odx =
+            createOdxWithDiagLayerContainer {
+                basevariants = BASEVARIANTS().apply { basevariant.add(bv) }
+            }
 
         val collection = ODXCollection(odx)
         assertThat(collection.requests).hasSize(1)
@@ -185,9 +187,10 @@ class ODXCollectionTest {
         bv.shortname = "BaseVar1"
         bv.diagdatadictionaryspec = ddd
 
-        val odx = createOdxWithDiagLayerContainer {
-            basevariants = BASEVARIANTS().apply { basevariant.add(bv) }
-        }
+        val odx =
+            createOdxWithDiagLayerContainer {
+                basevariants = BASEVARIANTS().apply { basevariant.add(bv) }
+            }
 
         val collection = ODXCollection(odx)
         assertThat(collection.dataObjectProps).hasSize(1)
@@ -208,9 +211,10 @@ class ODXCollectionTest {
         bv.shortname = "BaseVar1"
         bv.diagdatadictionaryspec = ddd
 
-        val odx = createOdxWithDiagLayerContainer {
-            basevariants = BASEVARIANTS().apply { basevariant.add(bv) }
-        }
+        val odx =
+            createOdxWithDiagLayerContainer {
+                basevariants = BASEVARIANTS().apply { basevariant.add(bv) }
+            }
 
         val collection = ODXCollection(odx)
         assertThat(collection.resolveDopByShortName("MyDOP")).isSameInstanceAs(dop)
@@ -228,9 +232,10 @@ class ODXCollectionTest {
         bv.shortname = "BaseVar1"
         bv.diagcomms = DIAGCOMMS().apply { diagcommproxy.add(service) }
 
-        val odx = createOdxWithDiagLayerContainer {
-            basevariants = BASEVARIANTS().apply { basevariant.add(bv) }
-        }
+        val odx =
+            createOdxWithDiagLayerContainer {
+                basevariants = BASEVARIANTS().apply { basevariant.add(bv) }
+            }
 
         val collection = ODXCollection(odx)
         assertThat(collection.resolveDiagServiceByShortName("ReadDTC")).isSameInstanceAs(service)
@@ -251,9 +256,10 @@ class ODXCollectionTest {
         bv.shortname = "BaseVar1"
         bv.diagdatadictionaryspec = ddd
 
-        val odx = createOdxWithDiagLayerContainer {
-            basevariants = BASEVARIANTS().apply { basevariant.add(bv) }
-        }
+        val odx =
+            createOdxWithDiagLayerContainer {
+                basevariants = BASEVARIANTS().apply { basevariant.add(bv) }
+            }
 
         val collection = ODXCollection(odx)
         assertThat(collection.structures).hasSize(1)
@@ -266,9 +272,10 @@ class ODXCollectionTest {
         protocol.id = "proto1"
         protocol.shortname = "UDS"
 
-        val odx = createOdxWithDiagLayerContainer {
-            protocols = PROTOCOLS().apply { this.protocol.add(protocol) }
-        }
+        val odx =
+            createOdxWithDiagLayerContainer {
+                protocols = PROTOCOLS().apply { this.protocol.add(protocol) }
+            }
 
         val collection = ODXCollection(odx)
         assertThat(collection.protocols).hasSize(1)
@@ -295,9 +302,10 @@ class ODXCollectionTest {
         fg.id = "fg1"
         fg.shortname = "FuncGroup1"
 
-        val odx = createOdxWithDiagLayerContainer {
-            functionalgroups = FUNCTIONALGROUPS().apply { functionalgroup.add(fg) }
-        }
+        val odx =
+            createOdxWithDiagLayerContainer {
+                functionalgroups = FUNCTIONALGROUPS().apply { functionalgroup.add(fg) }
+            }
 
         val collection = ODXCollection(odx)
         assertThat(collection.functionalGroups).hasSize(1)
@@ -310,9 +318,10 @@ class ODXCollectionTest {
         esd.id = "esd1"
         esd.shortname = "SharedData1"
 
-        val odx = createOdxWithDiagLayerContainer {
-            ecushareddatas = ECUSHAREDDATAS().apply { ecushareddata.add(esd) }
-        }
+        val odx =
+            createOdxWithDiagLayerContainer {
+                ecushareddatas = ECUSHAREDDATAS().apply { ecushareddata.add(esd) }
+            }
 
         val collection = ODXCollection(odx)
         assertThat(collection.ecuSharedDatas).hasSize(1)
