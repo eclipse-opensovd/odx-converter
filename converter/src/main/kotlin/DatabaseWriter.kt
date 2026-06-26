@@ -756,7 +756,8 @@ class DatabaseWriter(
                         is TABLESTRUCT -> {
                             val tableKey =
                                 this.tablekeysnref?.shortname?.let { shortName ->
-                                    collectionOf(this).tableKeys.values
+                                    collectionOf(this)
+                                        .tableKeys.values
                                         .firstOrNull { it.shortname == shortName }
                                         ?.offset()
                                         ?: error("Couldn't find TABLE-KEY by short name: $shortName")
