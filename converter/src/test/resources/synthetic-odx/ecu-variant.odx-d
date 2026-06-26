@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Synthetic ODX file for integration testing.
+  Contains an ECU-VARIANT that inherits from the base variant in base-variant.odx,
+  with its own additional service, a SINGLE-ECU-JOB, and an ECU-VARIANT-PATTERN for identification.
+-->
+<ODX MODEL-VERSION="2.2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <DIAG-LAYER-CONTAINER ID="dlc_ecu_variant">
+    <SHORT-NAME>EcuVariantContainer</SHORT-NAME>
+    <ECU-VARIANTS>
+      <ECU-VARIANT ID="ev_synth_variant_a">
+        <SHORT-NAME>SynthVariantA</SHORT-NAME>
+        <LONG-NAME>Synthetic ECU Variant A</LONG-NAME>
+
+        <DIAG-DATA-DICTIONARY-SPEC>
+          <DATA-OBJECT-PROPS>
+            <!-- Variant-specific DOP: 4-byte integer -->
+            <DATA-OBJECT-PROP ID="dop_uint32_var">
+              <SHORT-NAME>DOP_UInt32_Var</SHORT-NAME>
+              <COMPU-METHOD>
+                <CATEGORY>IDENTICAL</CATEGORY>
+              </COMPU-METHOD>
+              <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                <BIT-LENGTH>32</BIT-LENGTH>
+              </DIAG-CODED-TYPE>
+              <PHYSICAL-TYPE BASE-DATA-TYPE="A_UINT32"/>
+            </DATA-OBJECT-PROP>
+          </DATA-OBJECT-PROPS>
+        </DIAG-DATA-DICTIONARY-SPEC>
+
+        <!-- Additional variant-specific service and single ECU job -->
+        <DIAG-COMMS>
+          <DIAG-SERVICE ID="ds_write_data_var" SEMANTIC="DOWNLOAD" ADDRESSING="PHYSICAL" TRANSMISSION-MODE="SEND-AND-RECEIVE">
+            <SHORT-NAME>WriteDataByIdentifier</SHORT-NAME>
+            <LONG-NAME>Write Data By Identifier</LONG-NAME>
+            <REQUEST-REF ID-REF="req_write_data_var"/>
+            <POS-RESPONSE-REFS>
+              <POS-RESPONSE-REF ID-REF="pr_write_data_var"/>
+            </POS-RESPONSE-REFS>
+          </DIAG-SERVICE>
+          <SINGLE-ECU-JOB ID="sej_reset_ecu">
+            <SHORT-NAME>ResetECU</SHORT-NAME>
+            <AUDIENCE IS-SUPPLIER="true"/>
+            <PROG-CODES>
+              <PROG-CODE>
+                <CODE-FILE>reset.jar</CODE-FILE>
+                <SYNTAX>JAR</SYNTAX>
+                <REVISION>1.0</REVISION>
+                <ENTRYPOINT>com.test.Reset</ENTRYPOINT>
+                <LIBRARY-REFS>
+                  <LIBRARY-REF ID-REF="lib_reset"/>
+                </LIBRARY-REFS>
+              </PROG-CODE>
+            </PROG-CODES>
+            <INPUT-PARAMS>
+              <INPUT-PARAM>
+                <SHORT-NAME>ResetType</SHORT-NAME>
+                <PHYSICAL-DEFAULT-VALUE>soft</PHYSICAL-DEFAULT-VALUE>
+                <DOP-BASE-REF ID-REF="dop_uint32_var"/>
+              </INPUT-PARAM>
+            </INPUT-PARAMS>
+            <OUTPUT-PARAMS>
+              <OUTPUT-PARAM ID="op_result" SEMANTIC="DATA">
+                <SHORT-NAME>ResetResult</SHORT-NAME>
+                <DOP-BASE-REF ID-REF="dop_uint32_var"/>
+              </OUTPUT-PARAM>
+            </OUTPUT-PARAMS>
+            <NEG-OUTPUT-PARAMS>
+              <NEG-OUTPUT-PARAM>
+                <SHORT-NAME>ErrorCode</SHORT-NAME>
+                <DOP-BASE-REF ID-REF="dop_uint32_var"/>
+              </NEG-OUTPUT-PARAM>
+            </NEG-OUTPUT-PARAMS>
+          </SINGLE-ECU-JOB>
+        </DIAG-COMMS>
+
+        <REQUESTS>
+          <REQUEST ID="req_write_data_var">
+            <SHORT-NAME>RQ_WriteDataByIdentifier</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>46</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>DataIdentifier</SHORT-NAME>
+                <BYTE-POSITION>1</BYTE-POSITION>
+                <DOP-REF ID-REF="dop_uint32_var"/>
+              </PARAM>
+            </PARAMS>
+          </REQUEST>
+        </REQUESTS>
+
+        <POS-RESPONSES>
+          <POS-RESPONSE ID="pr_write_data_var">
+            <SHORT-NAME>PR_WriteDataByIdentifier</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>110</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>WriteResult</SHORT-NAME>
+                <BYTE-POSITION>1</BYTE-POSITION>
+                <DOP-REF ID-REF="dop_uint32_var"/>
+              </PARAM>
+            </PARAMS>
+          </POS-RESPONSE>
+        </POS-RESPONSES>
+
+        <LIBRARYS>
+          <LIBRARY ID="lib_reset">
+            <SHORT-NAME>ResetLib</SHORT-NAME>
+            <CODE-FILE>resetlib.jar</CODE-FILE>
+            <SYNTAX>JAR</SYNTAX>
+            <REVISION>1.0</REVISION>
+          </LIBRARY>
+        </LIBRARYS>
+
+        <!-- Variant identification pattern -->
+        <ECU-VARIANT-PATTERNS>
+          <ECU-VARIANT-PATTERN>
+            <MATCHING-PARAMETERS>
+              <MATCHING-PARAMETER>
+                <EXPECTED-VALUE>VariantA_1.0</EXPECTED-VALUE>
+                <DIAG-COMM-SNREF SHORT-NAME="WriteDataByIdentifier"/>
+                <OUT-PARAM-IF-SNREF SHORT-NAME="WriteResult"/>
+              </MATCHING-PARAMETER>
+            </MATCHING-PARAMETERS>
+          </ECU-VARIANT-PATTERN>
+        </ECU-VARIANT-PATTERNS>
+
+        <!-- Parent reference to base variant (cross-file) with not-inherited elements -->
+        <PARENT-REFS>
+          <PARENT-REF xsi:type="BASE-VARIANT-REF" ID-REF="bv_synth_ecu" DOCREF="BaseContainer" DOCTYPE="LAYER">
+            <NOT-INHERITED-DIAG-COMMS>
+              <NOT-INHERITED-DIAG-COMM>
+                <DIAG-COMM-SNREF SHORT-NAME="DiagnosticSessionControl"/>
+              </NOT-INHERITED-DIAG-COMM>
+            </NOT-INHERITED-DIAG-COMMS>
+            <NOT-INHERITED-VARIABLES>
+              <NOT-INHERITED-VARIABLE>
+                <DIAG-VARIABLE-SNREF SHORT-NAME="SomeVariable"/>
+              </NOT-INHERITED-VARIABLE>
+            </NOT-INHERITED-VARIABLES>
+            <NOT-INHERITED-DOPS>
+              <NOT-INHERITED-DOP>
+                <DOP-BASE-SNREF SHORT-NAME="DOP_RatFunc"/>
+              </NOT-INHERITED-DOP>
+            </NOT-INHERITED-DOPS>
+            <NOT-INHERITED-TABLES>
+              <NOT-INHERITED-TABLE>
+                <TABLE-SNREF SHORT-NAME="VariantTable"/>
+              </NOT-INHERITED-TABLE>
+            </NOT-INHERITED-TABLES>
+            <NOT-INHERITED-GLOBAL-NEG-RESPONSES>
+              <NOT-INHERITED-GLOBAL-NEG-RESPONSE>
+                <GLOBAL-NEG-RESPONSE-SNREF SHORT-NAME="GNR_Busy"/>
+              </NOT-INHERITED-GLOBAL-NEG-RESPONSE>
+            </NOT-INHERITED-GLOBAL-NEG-RESPONSES>
+          </PARENT-REF>
+          <PARENT-REF xsi:type="ECU-SHARED-DATA-REF" ID-REF="esd_common" DOCREF="BaseContainer" DOCTYPE="LAYER"/>
+        </PARENT-REFS>
+
+      </ECU-VARIANT>
+    </ECU-VARIANTS>
+  </DIAG-LAYER-CONTAINER>
+</ODX>

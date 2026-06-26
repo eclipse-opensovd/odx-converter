@@ -25,7 +25,6 @@ import schema.odx.ODXLINK
 import kotlin.test.Test
 
 class DatabaseWriterFilterTest {
-
     /**
      * DatabaseWriter's filterByConverterOptions and isIncludedWithOption are
      * instance methods that need an ODXCollectionGroup for audience resolution.
@@ -54,7 +53,9 @@ class DatabaseWriterFilterTest {
 
     private fun createWriter(withAudiences: List<String>): DatabaseWriter {
         val options = ConverterOptions(withAudiences = withAudiences)
-        val logger = java.util.logging.Logger.getLogger("test")
+        val logger =
+            java.util.logging.Logger
+                .getLogger("test")
 
         // Create mock ODXCollectionGroup that resolves audiences
         val odx = mockk<ODXCollectionGroup>()
@@ -75,10 +76,11 @@ class DatabaseWriterFilterTest {
     @Test
     fun `filterByConverterOptions includes all when withAudiences is empty`() {
         val writer = createWriter(withAudiences = emptyList())
-        val services = listOf(
-            createDiagServiceWithAudience("AfterSales"),
-            createDiagServiceWithAudience("Development"),
-        )
+        val services =
+            listOf(
+                createDiagServiceWithAudience("AfterSales"),
+                createDiagServiceWithAudience("Development"),
+            )
 
         val filtered = with(writer) { services.filterByConverterOptions(ConverterOptions()) }
         assertThat(filtered).hasSize(2)

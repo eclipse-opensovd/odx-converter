@@ -1,0 +1,1080 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Synthetic ODX file for integration testing.
+  Contains a BASE-VARIANT with comprehensive diagnostic elements to exercise
+  all major converter code paths: multiple PARAM types, DOP types,
+  COMPU-METHOD categories, DIAG-CODED-TYPE subtypes, SDGs, AUDIENCE,
+  STATE-CHART, DTC-DOP, TABLE, MUX, ENV-DATA, STRUCTURE, etc.
+-->
+<ODX MODEL-VERSION="2.2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <DIAG-LAYER-CONTAINER ID="dlc_base">
+    <SHORT-NAME>BaseContainer</SHORT-NAME>
+    <ECU-SHARED-DATAS>
+      <ECU-SHARED-DATA ID="esd_common">
+        <SHORT-NAME>CommonSharedData</SHORT-NAME>
+        <LONG-NAME TI="en">Common ECU Shared Data</LONG-NAME>
+      </ECU-SHARED-DATA>
+    </ECU-SHARED-DATAS>
+    <BASE-VARIANTS>
+      <BASE-VARIANT ID="bv_synth_ecu">
+        <SHORT-NAME>SynthECU</SHORT-NAME>
+        <LONG-NAME TI="en">Synthetic ECU Base Variant</LONG-NAME>
+
+        <SDGS>
+          <SDG SI="TestGroup">
+            <SDG-CAPTION>
+              <SHORT-NAME>TestCaption</SHORT-NAME>
+            </SDG-CAPTION>
+            <SD SI="key1" TI="en">value1</SD>
+            <SD SI="key2">value2</SD>
+            <SDG SI="NestedGroup">
+              <SD SI="nested_key">nested_value</SD>
+            </SDG>
+          </SDG>
+        </SDGS>
+
+        <FUNCT-CLASSS>
+          <FUNCT-CLASS ID="fc_ident">
+            <SHORT-NAME>Identification</SHORT-NAME>
+          </FUNCT-CLASS>
+          <FUNCT-CLASS ID="fc_diag">
+            <SHORT-NAME>Diagnostic</SHORT-NAME>
+          </FUNCT-CLASS>
+        </FUNCT-CLASSS>
+
+        <ADDITIONAL-AUDIENCES>
+          <ADDITIONAL-AUDIENCE ID="aa_supplier">
+            <SHORT-NAME>SupplierAudience</SHORT-NAME>
+            <LONG-NAME TI="en">Supplier Audience</LONG-NAME>
+          </ADDITIONAL-AUDIENCE>
+          <ADDITIONAL-AUDIENCE ID="aa_development">
+            <SHORT-NAME>DevelopmentAudience</SHORT-NAME>
+          </ADDITIONAL-AUDIENCE>
+        </ADDITIONAL-AUDIENCES>
+
+        <DIAG-DATA-DICTIONARY-SPEC>
+          <DATA-OBJECT-PROPS>
+            <!-- DOP 1: IDENTICAL, STANDARD-LENGTH-TYPE, uint8 -->
+            <DATA-OBJECT-PROP ID="dop_uint8">
+              <SHORT-NAME>DOP_UInt8</SHORT-NAME>
+              <COMPU-METHOD>
+                <CATEGORY>IDENTICAL</CATEGORY>
+              </COMPU-METHOD>
+              <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                <BIT-LENGTH>8</BIT-LENGTH>
+              </DIAG-CODED-TYPE>
+              <PHYSICAL-TYPE BASE-DATA-TYPE="A_UINT32"/>
+            </DATA-OBJECT-PROP>
+
+            <!-- DOP 2: IDENTICAL, uint16 -->
+            <DATA-OBJECT-PROP ID="dop_uint16">
+              <SHORT-NAME>DOP_UInt16</SHORT-NAME>
+              <COMPU-METHOD>
+                <CATEGORY>IDENTICAL</CATEGORY>
+              </COMPU-METHOD>
+              <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                <BIT-LENGTH>16</BIT-LENGTH>
+              </DIAG-CODED-TYPE>
+              <PHYSICAL-TYPE BASE-DATA-TYPE="A_UINT32"/>
+            </DATA-OBJECT-PROP>
+
+            <!-- DOP 3: TEXTTABLE with COMPU-INTERNAL-TO-PHYS -->
+            <DATA-OBJECT-PROP ID="dop_status_text">
+              <SHORT-NAME>DOP_StatusText</SHORT-NAME>
+              <COMPU-METHOD>
+                <CATEGORY>TEXTTABLE</CATEGORY>
+                <COMPU-INTERNAL-TO-PHYS>
+                  <COMPU-SCALES>
+                    <COMPU-SCALE>
+                      <SHORT-LABEL>OK_Label</SHORT-LABEL>
+                      <LOWER-LIMIT>0</LOWER-LIMIT>
+                      <UPPER-LIMIT>0</UPPER-LIMIT>
+                      <COMPU-CONST>
+                        <VT>OK</VT>
+                      </COMPU-CONST>
+                    </COMPU-SCALE>
+                    <COMPU-SCALE>
+                      <SHORT-LABEL>ERR_Label</SHORT-LABEL>
+                      <LOWER-LIMIT>1</LOWER-LIMIT>
+                      <UPPER-LIMIT>1</UPPER-LIMIT>
+                      <COMPU-CONST>
+                        <VT>ERROR</VT>
+                      </COMPU-CONST>
+                    </COMPU-SCALE>
+                  </COMPU-SCALES>
+                  <COMPU-DEFAULT-VALUE>
+                    <VT>UNKNOWN</VT>
+                  </COMPU-DEFAULT-VALUE>
+                </COMPU-INTERNAL-TO-PHYS>
+              </COMPU-METHOD>
+              <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                <BIT-LENGTH>8</BIT-LENGTH>
+              </DIAG-CODED-TYPE>
+              <PHYSICAL-TYPE BASE-DATA-TYPE="A_UNICODE2STRING"/>
+            </DATA-OBJECT-PROP>
+
+            <!-- DOP 4: LINEAR COMPU-METHOD with COMPU-RATIONAL-COEFFS, INTERNAL-CONSTR, PHYS-CONSTR -->
+            <DATA-OBJECT-PROP ID="dop_linear_temp">
+              <SHORT-NAME>DOP_LinearTemp</SHORT-NAME>
+              <COMPU-METHOD>
+                <CATEGORY>LINEAR</CATEGORY>
+                <COMPU-INTERNAL-TO-PHYS>
+                  <COMPU-SCALES>
+                    <COMPU-SCALE>
+                      <LOWER-LIMIT>0</LOWER-LIMIT>
+                      <UPPER-LIMIT>255</UPPER-LIMIT>
+                      <COMPU-RATIONAL-COEFFS>
+                        <COMPU-NUMERATOR>
+                          <V>-40</V>
+                          <V>0.5</V>
+                        </COMPU-NUMERATOR>
+                        <COMPU-DENOMINATOR>
+                          <V>1</V>
+                        </COMPU-DENOMINATOR>
+                      </COMPU-RATIONAL-COEFFS>
+                    </COMPU-SCALE>
+                  </COMPU-SCALES>
+                </COMPU-INTERNAL-TO-PHYS>
+              </COMPU-METHOD>
+              <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32" IS-HIGHLOW-BYTE-ORDER="false">
+                <BIT-LENGTH>8</BIT-LENGTH>
+              </DIAG-CODED-TYPE>
+              <PHYSICAL-TYPE BASE-DATA-TYPE="A_FLOAT32">
+                <PRECISION>1</PRECISION>
+              </PHYSICAL-TYPE>
+              <INTERNAL-CONSTR>
+                <LOWER-LIMIT>0</LOWER-LIMIT>
+                <UPPER-LIMIT>255</UPPER-LIMIT>
+                <SCALE-CONSTRS>
+                  <SCALE-CONSTR VALIDITY="VALID">
+                    <SHORT-LABEL>ValidRange</SHORT-LABEL>
+                    <LOWER-LIMIT>0</LOWER-LIMIT>
+                    <UPPER-LIMIT>200</UPPER-LIMIT>
+                  </SCALE-CONSTR>
+                </SCALE-CONSTRS>
+              </INTERNAL-CONSTR>
+              <UNIT-REF ID-REF="unit_ms" DOCREF="CANParameters" DOCTYPE="COMPARAM-SUBSET"/>
+              <PHYS-CONSTR>
+                <LOWER-LIMIT>-40</LOWER-LIMIT>
+                <UPPER-LIMIT>87</UPPER-LIMIT>
+              </PHYS-CONSTR>
+            </DATA-OBJECT-PROP>
+
+            <!-- DOP 5: MIN-MAX-LENGTH-TYPE (variable-length string) -->
+            <DATA-OBJECT-PROP ID="dop_varstring">
+              <SHORT-NAME>DOP_VarString</SHORT-NAME>
+              <COMPU-METHOD>
+                <CATEGORY>IDENTICAL</CATEGORY>
+              </COMPU-METHOD>
+              <DIAG-CODED-TYPE xsi:type="MIN-MAX-LENGTH-TYPE" BASE-DATA-TYPE="A_BYTEFIELD" TERMINATION="END-OF-PDU">
+                <MIN-LENGTH>0</MIN-LENGTH>
+                <MAX-LENGTH>64</MAX-LENGTH>
+              </DIAG-CODED-TYPE>
+              <PHYSICAL-TYPE BASE-DATA-TYPE="A_UNICODE2STRING"/>
+            </DATA-OBJECT-PROP>
+
+            <!-- DOP 6: LEADING-LENGTH-INFO-TYPE -->
+            <DATA-OBJECT-PROP ID="dop_leading_len">
+              <SHORT-NAME>DOP_LeadingLen</SHORT-NAME>
+              <COMPU-METHOD>
+                <CATEGORY>IDENTICAL</CATEGORY>
+              </COMPU-METHOD>
+              <DIAG-CODED-TYPE xsi:type="LEADING-LENGTH-INFO-TYPE" BASE-DATA-TYPE="A_BYTEFIELD">
+                <BIT-LENGTH>8</BIT-LENGTH>
+              </DIAG-CODED-TYPE>
+              <PHYSICAL-TYPE BASE-DATA-TYPE="A_BYTEFIELD"/>
+            </DATA-OBJECT-PROP>
+
+            <!-- DOP 7: DOP for MUX switch key -->
+            <DATA-OBJECT-PROP ID="dop_mux_key">
+              <SHORT-NAME>DOP_MuxKey</SHORT-NAME>
+              <COMPU-METHOD>
+                <CATEGORY>IDENTICAL</CATEGORY>
+              </COMPU-METHOD>
+              <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                <BIT-LENGTH>8</BIT-LENGTH>
+              </DIAG-CODED-TYPE>
+              <PHYSICAL-TYPE BASE-DATA-TYPE="A_UINT32"/>
+            </DATA-OBJECT-PROP>
+
+            <!-- DOP 8: RAT-FUNC COMPU-METHOD with phys-to-internal -->
+            <DATA-OBJECT-PROP ID="dop_ratfunc">
+              <SHORT-NAME>DOP_RatFunc</SHORT-NAME>
+              <COMPU-METHOD>
+                <CATEGORY>RAT-FUNC</CATEGORY>
+                <COMPU-INTERNAL-TO-PHYS>
+                  <COMPU-SCALES>
+                    <COMPU-SCALE>
+                      <COMPU-RATIONAL-COEFFS>
+                        <COMPU-NUMERATOR>
+                          <V>0</V>
+                          <V>1</V>
+                        </COMPU-NUMERATOR>
+                        <COMPU-DENOMINATOR>
+                          <V>10</V>
+                        </COMPU-DENOMINATOR>
+                      </COMPU-RATIONAL-COEFFS>
+                    </COMPU-SCALE>
+                  </COMPU-SCALES>
+                </COMPU-INTERNAL-TO-PHYS>
+                <COMPU-PHYS-TO-INTERNAL>
+                  <COMPU-SCALES>
+                    <COMPU-SCALE>
+                      <COMPU-RATIONAL-COEFFS>
+                        <COMPU-NUMERATOR>
+                          <V>0</V>
+                          <V>10</V>
+                        </COMPU-NUMERATOR>
+                        <COMPU-DENOMINATOR>
+                          <V>1</V>
+                        </COMPU-DENOMINATOR>
+                      </COMPU-RATIONAL-COEFFS>
+                    </COMPU-SCALE>
+                  </COMPU-SCALES>
+                </COMPU-PHYS-TO-INTERNAL>
+              </COMPU-METHOD>
+              <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                <BIT-LENGTH>16</BIT-LENGTH>
+              </DIAG-CODED-TYPE>
+              <PHYSICAL-TYPE BASE-DATA-TYPE="A_FLOAT32"/>
+            </DATA-OBJECT-PROP>
+            <!-- DOP 9: STANDARD-LENGTH-TYPE with BIT-MASK -->
+            <DATA-OBJECT-PROP ID="dop_masked">
+              <SHORT-NAME>DOP_Masked</SHORT-NAME>
+              <COMPU-METHOD>
+                <CATEGORY>IDENTICAL</CATEGORY>
+              </COMPU-METHOD>
+              <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                <BIT-LENGTH>8</BIT-LENGTH>
+                <BIT-MASK>0F</BIT-MASK>
+              </DIAG-CODED-TYPE>
+              <PHYSICAL-TYPE BASE-DATA-TYPE="A_UINT32"/>
+            </DATA-OBJECT-PROP>
+
+            <!-- DOP 10: with COMPU-INVERSE-VALUE in TEXTTABLE scale -->
+            <DATA-OBJECT-PROP ID="dop_with_inverse">
+              <SHORT-NAME>DOP_WithInverse</SHORT-NAME>
+              <COMPU-METHOD>
+                <CATEGORY>TEXTTABLE</CATEGORY>
+                <COMPU-INTERNAL-TO-PHYS>
+                  <COMPU-SCALES>
+                    <COMPU-SCALE>
+                      <LOWER-LIMIT>0</LOWER-LIMIT>
+                      <UPPER-LIMIT>0</UPPER-LIMIT>
+                      <COMPU-INVERSE-VALUE>
+                        <V>0</V>
+                      </COMPU-INVERSE-VALUE>
+                      <COMPU-CONST>
+                        <VT>OFF</VT>
+                      </COMPU-CONST>
+                    </COMPU-SCALE>
+                    <COMPU-SCALE>
+                      <LOWER-LIMIT>1</LOWER-LIMIT>
+                      <UPPER-LIMIT>1</UPPER-LIMIT>
+                      <COMPU-INVERSE-VALUE>
+                        <V>1</V>
+                      </COMPU-INVERSE-VALUE>
+                      <COMPU-CONST>
+                        <VT>ON</VT>
+                      </COMPU-CONST>
+                    </COMPU-SCALE>
+                  </COMPU-SCALES>
+                  <COMPU-DEFAULT-VALUE>
+                    <V>255</V>
+                    <COMPU-INVERSE-VALUE>
+                      <V>255</V>
+                    </COMPU-INVERSE-VALUE>
+                  </COMPU-DEFAULT-VALUE>
+                </COMPU-INTERNAL-TO-PHYS>
+              </COMPU-METHOD>
+              <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                <BIT-LENGTH>8</BIT-LENGTH>
+              </DIAG-CODED-TYPE>
+              <PHYSICAL-TYPE BASE-DATA-TYPE="A_UNICODE2STRING"/>
+            </DATA-OBJECT-PROP>
+
+            <!-- DOP 11: DOP for PARAM-LENGTH-INFO-TYPE usage -->
+            <DATA-OBJECT-PROP ID="dop_paramlen">
+              <SHORT-NAME>DOP_ParamLen</SHORT-NAME>
+              <COMPU-METHOD>
+                <CATEGORY>IDENTICAL</CATEGORY>
+              </COMPU-METHOD>
+              <DIAG-CODED-TYPE xsi:type="PARAM-LENGTH-INFO-TYPE" BASE-DATA-TYPE="A_BYTEFIELD">
+                <LENGTH-KEY-REF ID-REF="lk_param"/>
+              </DIAG-CODED-TYPE>
+              <PHYSICAL-TYPE BASE-DATA-TYPE="A_BYTEFIELD"/>
+            </DATA-OBJECT-PROP>
+          </DATA-OBJECT-PROPS>
+
+          <!-- Structures -->
+          <STRUCTURES>
+            <STRUCTURE ID="struct_ident_data">
+              <SHORT-NAME>IdentData</SHORT-NAME>
+              <BYTE-SIZE>4</BYTE-SIZE>
+              <PARAMS>
+                <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                  <SHORT-NAME>HardwareVersion</SHORT-NAME>
+                  <BYTE-POSITION>0</BYTE-POSITION>
+                  <DOP-REF ID-REF="dop_uint16"/>
+                </PARAM>
+                <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                  <SHORT-NAME>SoftwareVersion</SHORT-NAME>
+                  <BYTE-POSITION>2</BYTE-POSITION>
+                  <DOP-REF ID-REF="dop_uint16"/>
+                </PARAM>
+              </PARAMS>
+            </STRUCTURE>
+
+            <!-- Structure for MUX cases -->
+            <STRUCTURE ID="struct_mux_case_a">
+              <SHORT-NAME>MuxCaseA</SHORT-NAME>
+              <PARAMS>
+                <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                  <SHORT-NAME>CaseAValue</SHORT-NAME>
+                  <BYTE-POSITION>0</BYTE-POSITION>
+                  <DOP-REF ID-REF="dop_uint8"/>
+                </PARAM>
+              </PARAMS>
+            </STRUCTURE>
+
+            <STRUCTURE ID="struct_mux_default">
+              <SHORT-NAME>MuxDefault</SHORT-NAME>
+              <PARAMS>
+                <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                  <SHORT-NAME>DefaultValue</SHORT-NAME>
+                  <BYTE-POSITION>0</BYTE-POSITION>
+                  <DOP-REF ID-REF="dop_uint8"/>
+                </PARAM>
+              </PARAMS>
+            </STRUCTURE>
+
+            <!-- Structure for END-OF-PDU-FIELD / STATIC-FIELD basic structure -->
+            <STRUCTURE ID="struct_repeated_item">
+              <SHORT-NAME>RepeatedItem</SHORT-NAME>
+              <BYTE-SIZE>2</BYTE-SIZE>
+              <PARAMS>
+                <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                  <SHORT-NAME>ItemValue</SHORT-NAME>
+                  <BYTE-POSITION>0</BYTE-POSITION>
+                  <DOP-REF ID-REF="dop_uint16"/>
+                </PARAM>
+              </PARAMS>
+            </STRUCTURE>
+          </STRUCTURES>
+
+          <!-- ENV-DATA -->
+          <ENV-DATAS>
+            <ENV-DATA ID="env_data_freeze">
+              <SHORT-NAME>FreezeFrameData</SHORT-NAME>
+              <PARAMS>
+                <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                  <SHORT-NAME>EngineSpeed</SHORT-NAME>
+                  <BYTE-POSITION>0</BYTE-POSITION>
+                  <DOP-REF ID-REF="dop_uint16"/>
+                </PARAM>
+                <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                  <SHORT-NAME>VehicleSpeed</SHORT-NAME>
+                  <BYTE-POSITION>2</BYTE-POSITION>
+                  <DOP-REF ID-REF="dop_uint8"/>
+                </PARAM>
+              </PARAMS>
+            </ENV-DATA>
+          </ENV-DATAS>
+
+          <!-- ENV-DATA-DESC -->
+          <ENV-DATA-DESCS>
+            <ENV-DATA-DESC ID="env_data_desc1">
+              <SHORT-NAME>FreezeFrameDesc</SHORT-NAME>
+              <PARAM-SNREF SHORT-NAME="StatusOfDTC"/>
+              <ENV-DATA-REFS>
+                <ENV-DATA-REF ID-REF="env_data_freeze"/>
+              </ENV-DATA-REFS>
+            </ENV-DATA-DESC>
+          </ENV-DATA-DESCS>
+
+          <!-- END-OF-PDU-FIELD -->
+          <END-OF-PDU-FIELDS>
+            <END-OF-PDU-FIELD ID="eopf_items">
+              <SHORT-NAME>ItemList</SHORT-NAME>
+              <BASIC-STRUCTURE-SNREF SHORT-NAME="RepeatedItem"/>
+              <MAX-NUMBER-OF-ITEMS>10</MAX-NUMBER-OF-ITEMS>
+              <MIN-NUMBER-OF-ITEMS>0</MIN-NUMBER-OF-ITEMS>
+            </END-OF-PDU-FIELD>
+          </END-OF-PDU-FIELDS>
+
+          <!-- STATIC-FIELD -->
+          <STATIC-FIELDS>
+            <STATIC-FIELD ID="sf_fixed_items">
+              <SHORT-NAME>FixedItems</SHORT-NAME>
+              <BASIC-STRUCTURE-REF ID-REF="struct_repeated_item"/>
+              <ENV-DATA-DESC-SNREF SHORT-NAME="FreezeFrameDesc"/>
+              <FIXED-NUMBER-OF-ITEMS>3</FIXED-NUMBER-OF-ITEMS>
+              <ITEM-BYTE-SIZE>2</ITEM-BYTE-SIZE>
+            </STATIC-FIELD>
+          </STATIC-FIELDS>
+
+          <!-- DYNAMIC-LENGTH-FIELD -->
+          <DYNAMIC-LENGTH-FIELDS>
+            <DYNAMIC-LENGTH-FIELD ID="dlf_dynamic">
+              <SHORT-NAME>DynField</SHORT-NAME>
+              <BASIC-STRUCTURE-REF ID-REF="struct_repeated_item"/>
+              <OFFSET>0</OFFSET>
+              <DETERMINE-NUMBER-OF-ITEMS>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <BIT-POSITION>0</BIT-POSITION>
+                <DATA-OBJECT-PROP-REF ID-REF="dop_uint8"/>
+              </DETERMINE-NUMBER-OF-ITEMS>
+            </DYNAMIC-LENGTH-FIELD>
+          </DYNAMIC-LENGTH-FIELDS>
+
+          <!-- MUX -->
+          <MUXS>
+            <MUX ID="mux_selector" IS-VISIBLE="true">
+              <SHORT-NAME>SelectorMux</SHORT-NAME>
+              <BYTE-POSITION>0</BYTE-POSITION>
+              <SWITCH-KEY>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <BIT-POSITION>0</BIT-POSITION>
+                <DATA-OBJECT-PROP-REF ID-REF="dop_mux_key"/>
+              </SWITCH-KEY>
+              <DEFAULT-CASE>
+                <SHORT-NAME>DefaultMuxCase</SHORT-NAME>
+                <LONG-NAME TI="en">Default MUX Case</LONG-NAME>
+                <STRUCTURE-REF ID-REF="struct_mux_default"/>
+              </DEFAULT-CASE>
+              <CASES>
+                <CASE>
+                  <SHORT-NAME>CaseA</SHORT-NAME>
+                  <LONG-NAME TI="en">Case A</LONG-NAME>
+                  <LOWER-LIMIT>1</LOWER-LIMIT>
+                  <UPPER-LIMIT>1</UPPER-LIMIT>
+                  <STRUCTURE-SNREF SHORT-NAME="MuxCaseA"/>
+                </CASE>
+                <CASE>
+                  <SHORT-NAME>CaseB</SHORT-NAME>
+                  <LOWER-LIMIT>2</LOWER-LIMIT>
+                  <UPPER-LIMIT>3</UPPER-LIMIT>
+                  <STRUCTURE-REF ID-REF="struct_mux_default"/>
+                </CASE>
+              </CASES>
+            </MUX>
+          </MUXS>
+
+          <!-- DTC-DOP with inline DTCs -->
+          <DTC-DOPS>
+            <DTC-DOP ID="dtc_dop_main" IS-VISIBLE="true">
+              <SHORT-NAME>MainDTCDOP</SHORT-NAME>
+              <COMPU-METHOD>
+                <CATEGORY>IDENTICAL</CATEGORY>
+              </COMPU-METHOD>
+              <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                <BIT-LENGTH>24</BIT-LENGTH>
+              </DIAG-CODED-TYPE>
+              <PHYSICAL-TYPE BASE-DATA-TYPE="A_UINT32"/>
+              <DTCS>
+                <DTC ID="dtc_p0100" IS-TEMPORARY="false">
+                  <SHORT-NAME>P0100</SHORT-NAME>
+                  <TROUBLE-CODE>256</TROUBLE-CODE>
+                  <DISPLAY-TROUBLE-CODE>P0100</DISPLAY-TROUBLE-CODE>
+                  <TEXT TI="en">Mass Air Flow Circuit Malfunction</TEXT>
+                  <LEVEL>1</LEVEL>
+                  <SDGS>
+                    <SDG SI="DTCInfo">
+                      <SD SI="category">emission</SD>
+                    </SDG>
+                  </SDGS>
+                </DTC>
+                <DTC ID="dtc_p0200" IS-TEMPORARY="true">
+                  <SHORT-NAME>P0200</SHORT-NAME>
+                  <TROUBLE-CODE>512</TROUBLE-CODE>
+                  <DISPLAY-TROUBLE-CODE>P0200</DISPLAY-TROUBLE-CODE>
+                  <TEXT TI="en">Injector Circuit Malfunction</TEXT>
+                </DTC>
+              </DTCS>
+            </DTC-DOP>
+          </DTC-DOPS>
+
+          <!-- TABLE -->
+          <TABLES>
+            <TABLE ID="table_variants" SEMANTIC="VARIANT">
+              <SHORT-NAME>VariantTable</SHORT-NAME>
+              <LONG-NAME TI="en">Variant Configuration Table</LONG-NAME>
+              <KEY-LABEL>VariantKey</KEY-LABEL>
+              <STRUCT-LABEL>VariantData</STRUCT-LABEL>
+              <KEY-DOP-REF ID-REF="dop_uint8"/>
+              <TABLE-ROW ID="tr_row1" SEMANTIC="ROW">
+                <SHORT-NAME>Row1</SHORT-NAME>
+                <LONG-NAME TI="en">First Row</LONG-NAME>
+                <KEY>1</KEY>
+                <DATA-OBJECT-PROP-REF ID-REF="dop_uint8"/>
+                <FUNCT-CLASS-REFS>
+                  <FUNCT-CLASS-REF ID-REF="fc_ident"/>
+                </FUNCT-CLASS-REFS>
+                <STATE-TRANSITION-REFS>
+                  <STATE-TRANSITION-REF ID-REF="st_default_to_extended"/>
+                </STATE-TRANSITION-REFS>
+                <PRE-CONDITION-STATE-REFS>
+                  <PRE-CONDITION-STATE-REF ID-REF="state_default"/>
+                </PRE-CONDITION-STATE-REFS>
+              </TABLE-ROW>
+              <TABLE-ROW ID="tr_row2">
+                <SHORT-NAME>Row2</SHORT-NAME>
+                <KEY>2</KEY>
+                <STRUCTURE-REF ID-REF="struct_ident_data"/>
+              </TABLE-ROW>
+              <TABLE-DIAG-COMM-CONNECTORS>
+                <TABLE-DIAG-COMM-CONNECTOR>
+                  <SEMANTIC>READ</SEMANTIC>
+                  <DIAG-COMM-SNREF SHORT-NAME="ReadDataByIdentifier"/>
+                </TABLE-DIAG-COMM-CONNECTOR>
+                <TABLE-DIAG-COMM-CONNECTOR>
+                  <SEMANTIC>WRITE</SEMANTIC>
+                  <DIAG-COMM-REF ID-REF="ds_session_ctrl"/>
+                </TABLE-DIAG-COMM-CONNECTOR>
+              </TABLE-DIAG-COMM-CONNECTORS>
+            </TABLE>
+          </TABLES>
+        </DIAG-DATA-DICTIONARY-SPEC>
+
+        <!-- STATE-CHARTS -->
+        <STATE-CHARTS>
+          <STATE-CHART ID="sc_session">
+            <SHORT-NAME>SessionStateChart</SHORT-NAME>
+            <SEMANTIC>SESSION</SEMANTIC>
+            <START-STATE-SNREF SHORT-NAME="DefaultSession"/>
+            <STATES>
+              <STATE ID="state_default">
+                <SHORT-NAME>DefaultSession</SHORT-NAME>
+                <LONG-NAME TI="en">Default Session</LONG-NAME>
+              </STATE>
+              <STATE ID="state_extended">
+                <SHORT-NAME>ExtendedSession</SHORT-NAME>
+              </STATE>
+            </STATES>
+            <STATE-TRANSITIONS>
+              <STATE-TRANSITION ID="st_default_to_extended">
+                <SHORT-NAME>ToExtended</SHORT-NAME>
+                <SOURCE-SNREF SHORT-NAME="DefaultSession"/>
+                <TARGET-SNREF SHORT-NAME="ExtendedSession"/>
+              </STATE-TRANSITION>
+              <STATE-TRANSITION ID="st_extended_to_default">
+                <SHORT-NAME>ToDefault</SHORT-NAME>
+                <SOURCE-SNREF SHORT-NAME="ExtendedSession"/>
+                <TARGET-SNREF SHORT-NAME="DefaultSession"/>
+              </STATE-TRANSITION>
+            </STATE-TRANSITIONS>
+          </STATE-CHART>
+        </STATE-CHARTS>
+
+        <!-- Diagnostic Services -->
+        <DIAG-COMMS>
+          <!-- Service 1: ReadDataByIdentifier (0x22) with AUDIENCE -->
+          <DIAG-SERVICE ID="ds_read_data" SEMANTIC="IDENTIFICATION" ADDRESSING="PHYSICAL" TRANSMISSION-MODE="SEND-AND-RECEIVE">
+            <SHORT-NAME>ReadDataByIdentifier</SHORT-NAME>
+            <LONG-NAME TI="en">Read Data By Identifier</LONG-NAME>
+            <FUNCT-CLASS-REFS>
+              <FUNCT-CLASS-REF ID-REF="fc_ident"/>
+            </FUNCT-CLASS-REFS>
+            <AUDIENCE IS-SUPPLIER="true" IS-DEVELOPMENT="true" IS-MANUFACTURING="false" IS-AFTERSALES="true" IS-AFTERMARKET="false">
+              <ENABLED-AUDIENCE-REFS>
+                <ENABLED-AUDIENCE-REF ID-REF="aa_supplier"/>
+              </ENABLED-AUDIENCE-REFS>
+            </AUDIENCE>
+            <SDGS>
+              <SDG SI="ServiceInfo">
+                <SD SI="version">1.0</SD>
+              </SDG>
+            </SDGS>
+            <PRE-CONDITION-STATE-REFS>
+              <PRE-CONDITION-STATE-REF ID-REF="state_default"/>
+            </PRE-CONDITION-STATE-REFS>
+            <STATE-TRANSITION-REFS>
+              <STATE-TRANSITION-REF ID-REF="st_default_to_extended"/>
+            </STATE-TRANSITION-REFS>
+            <REQUEST-REF ID-REF="req_read_data"/>
+            <POS-RESPONSE-REFS>
+              <POS-RESPONSE-REF ID-REF="pr_read_data"/>
+            </POS-RESPONSE-REFS>
+            <NEG-RESPONSE-REFS>
+              <NEG-RESPONSE-REF ID-REF="nr_general"/>
+            </NEG-RESPONSE-REFS>
+          </DIAG-SERVICE>
+
+          <!-- Service 2: ReadDTCInformation (0x19) -->
+          <DIAG-SERVICE ID="ds_read_dtc" SEMANTIC="FAULT-MEMORY" ADDRESSING="PHYSICAL" TRANSMISSION-MODE="SEND-AND-RECEIVE">
+            <SHORT-NAME>ReadDTCInformation</SHORT-NAME>
+            <LONG-NAME TI="en">Read DTC Information</LONG-NAME>
+            <FUNCT-CLASS-REFS>
+              <FUNCT-CLASS-REF ID-REF="fc_diag"/>
+            </FUNCT-CLASS-REFS>
+            <AUDIENCE IS-SUPPLIER="false" IS-DEVELOPMENT="true">
+              <DISABLED-AUDIENCE-REFS>
+                <DISABLED-AUDIENCE-REF ID-REF="aa_supplier"/>
+              </DISABLED-AUDIENCE-REFS>
+            </AUDIENCE>
+            <PROTOCOL-SNREFS>
+              <PROTOCOL-SNREF SHORT-NAME="UDS_on_CAN"/>
+            </PROTOCOL-SNREFS>
+            <COMPARAM-REFS>
+              <COMPARAM-REF ID-REF="cp_baudrate" DOCREF="CANParameters" DOCTYPE="COMPARAM-SUBSET">
+                <SIMPLE-VALUE>250000</SIMPLE-VALUE>
+              </COMPARAM-REF>
+            </COMPARAM-REFS>
+            <REQUEST-REF ID-REF="req_read_dtc"/>
+            <POS-RESPONSE-REFS>
+              <POS-RESPONSE-REF ID-REF="pr_read_dtc"/>
+            </POS-RESPONSE-REFS>
+            <NEG-RESPONSE-REFS>
+              <NEG-RESPONSE-REF ID-REF="nr_general"/>
+            </NEG-RESPONSE-REFS>
+          </DIAG-SERVICE>
+
+          <!-- Service 3: DiagnosticSessionControl (0x10) -->
+          <DIAG-SERVICE ID="ds_session_ctrl" SEMANTIC="SESSION" ADDRESSING="PHYSICAL" TRANSMISSION-MODE="SEND-AND-RECEIVE">
+            <SHORT-NAME>DiagnosticSessionControl</SHORT-NAME>
+            <LONG-NAME TI="en">Diagnostic Session Control</LONG-NAME>
+            <REQUEST-REF ID-REF="req_session_ctrl"/>
+            <POS-RESPONSE-REFS>
+              <POS-RESPONSE-REF ID-REF="pr_session_ctrl"/>
+            </POS-RESPONSE-REFS>
+            <NEG-RESPONSE-REFS>
+              <NEG-RESPONSE-REF ID-REF="nr_general"/>
+            </NEG-RESPONSE-REFS>
+            <POS-RESPONSE-SUPPRESSABLE>
+              <BIT-MASK>80</BIT-MASK>
+              <VALUE-SNREF SHORT-NAME="SessionType"/>
+            </POS-RESPONSE-SUPPRESSABLE>
+          </DIAG-SERVICE>
+
+          <!-- Service 4: ReadWithAllParams - exercises all remaining param types -->
+          <DIAG-SERVICE ID="ds_all_params" SEMANTIC="DATA" ADDRESSING="FUNCTIONAL-OR-PHYSICAL" TRANSMISSION-MODE="SEND-AND-RECEIVE" IS-CYCLIC="true" IS-MULTIPLE="true" DIAGNOSTIC-CLASS="VARIANTIDENTIFICATION">
+            <SHORT-NAME>ReadWithAllParams</SHORT-NAME>
+            <RELATED-DIAG-COMM-REFS>
+              <RELATED-DIAG-COMM-REF ID-REF="ds_read_data"/>
+            </RELATED-DIAG-COMM-REFS>
+            <REQUEST-REF ID-REF="req_all_params"/>
+            <POS-RESPONSE-REFS>
+              <POS-RESPONSE-REF ID-REF="pr_all_params"/>
+            </POS-RESPONSE-REFS>
+          </DIAG-SERVICE>
+
+          <!-- Service 5: ReadComplexDops - exercises complex DOP types -->
+          <DIAG-SERVICE ID="ds_complex_dops" SEMANTIC="DATA" ADDRESSING="PHYSICAL" TRANSMISSION-MODE="SEND-AND-RECEIVE">
+            <SHORT-NAME>ReadComplexDops</SHORT-NAME>
+            <REQUEST-REF ID-REF="req_complex_dops"/>
+            <POS-RESPONSE-REFS>
+              <POS-RESPONSE-REF ID-REF="pr_complex_dops"/>
+            </POS-RESPONSE-REFS>
+            <NEG-RESPONSE-REFS>
+              <NEG-RESPONSE-REF ID-REF="nr_general"/>
+            </NEG-RESPONSE-REFS>
+          </DIAG-SERVICE>
+        </DIAG-COMMS>
+
+        <!-- Requests -->
+        <REQUESTS>
+          <REQUEST ID="req_read_data">
+            <SHORT-NAME>RQ_ReadDataByIdentifier</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>34</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>DataIdentifier</SHORT-NAME>
+                <BYTE-POSITION>1</BYTE-POSITION>
+                <DOP-REF ID-REF="dop_uint16"/>
+              </PARAM>
+            </PARAMS>
+          </REQUEST>
+
+          <REQUEST ID="req_read_dtc">
+            <SHORT-NAME>RQ_ReadDTCInformation</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>25</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>SubFunction</SHORT-NAME>
+                <BYTE-POSITION>1</BYTE-POSITION>
+                <DOP-REF ID-REF="dop_uint8"/>
+              </PARAM>
+            </PARAMS>
+          </REQUEST>
+
+          <REQUEST ID="req_session_ctrl">
+            <SHORT-NAME>RQ_DiagnosticSessionControl</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>16</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>SessionType</SHORT-NAME>
+                <BYTE-POSITION>1</BYTE-POSITION>
+                <DOP-REF ID-REF="dop_uint8"/>
+              </PARAM>
+            </PARAMS>
+          </REQUEST>
+
+          <!-- Request with all remaining PARAM types -->
+          <REQUEST ID="req_all_params">
+            <SHORT-NAME>RQ_AllParamTypes</SHORT-NAME>
+            <SDGS>
+              <SDG SI="ReqInfo">
+                <SD SI="purpose">testing</SD>
+              </SDG>
+            </SDGS>
+            <PARAMS>
+              <!-- CODED-CONST -->
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>49</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <!-- VALUE with DOP-SNREF -->
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>ValueBySNRef</SHORT-NAME>
+                <BYTE-POSITION>1</BYTE-POSITION>
+                <PHYSICAL-DEFAULT-VALUE>42</PHYSICAL-DEFAULT-VALUE>
+                <DOP-SNREF SHORT-NAME="DOP_UInt8"/>
+              </PARAM>
+              <!-- PHYS-CONST -->
+              <PARAM xsi:type="PHYS-CONST">
+                <SHORT-NAME>PhysConstParam</SHORT-NAME>
+                <BYTE-POSITION>2</BYTE-POSITION>
+                <PHYS-CONSTANT-VALUE>100</PHYS-CONSTANT-VALUE>
+                <DOP-SNREF SHORT-NAME="DOP_UInt8"/>
+              </PARAM>
+              <!-- RESERVED -->
+              <PARAM xsi:type="RESERVED">
+                <SHORT-NAME>ReservedByte</SHORT-NAME>
+                <BYTE-POSITION>3</BYTE-POSITION>
+                <BIT-LENGTH>8</BIT-LENGTH>
+              </PARAM>
+              <!-- DYNAMIC -->
+              <PARAM xsi:type="DYNAMIC">
+                <SHORT-NAME>DynParam</SHORT-NAME>
+                <BYTE-POSITION>4</BYTE-POSITION>
+              </PARAM>
+              <!-- LENGTH-KEY with DOP-SNREF -->
+              <PARAM xsi:type="LENGTH-KEY" ID="lk_param">
+                <SHORT-NAME>LenKeyParam</SHORT-NAME>
+                <BYTE-POSITION>5</BYTE-POSITION>
+                <DOP-SNREF SHORT-NAME="DOP_UInt8"/>
+              </PARAM>
+              <!-- TABLE-KEY -->
+              <PARAM xsi:type="TABLE-KEY" ID="tk_param">
+                <SHORT-NAME>TableKeyParam</SHORT-NAME>
+                <BYTE-POSITION>6</BYTE-POSITION>
+                <TABLE-REF ID-REF="table_variants"/>
+              </PARAM>
+              <!-- TABLE-STRUCT -->
+              <PARAM xsi:type="TABLE-STRUCT">
+                <SHORT-NAME>TableStructParam</SHORT-NAME>
+                <BYTE-POSITION>7</BYTE-POSITION>
+                <TABLE-KEY-SNREF SHORT-NAME="TableKeyParam"/>
+              </PARAM>
+              <!-- TABLE-ENTRY (removed: causes StackOverflowError in generated hashCode due to circular TABLE-ROW-REF) -->
+              <!-- SYSTEM -->
+              <PARAM xsi:type="SYSTEM" SYSPARAM="SID">
+                <SHORT-NAME>SystemParam</SHORT-NAME>
+                <BYTE-POSITION>9</BYTE-POSITION>
+                <DOP-SNREF SHORT-NAME="DOP_UInt8"/>
+              </PARAM>
+            </PARAMS>
+          </REQUEST>
+
+          <REQUEST ID="req_complex_dops">
+            <SHORT-NAME>RQ_ComplexDops</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>50</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+            </PARAMS>
+          </REQUEST>
+        </REQUESTS>
+
+        <!-- Positive Responses -->
+        <POS-RESPONSES>
+          <POS-RESPONSE ID="pr_read_data">
+            <SHORT-NAME>PR_ReadDataByIdentifier</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>98</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <PARAM xsi:type="MATCHING-REQUEST-PARAM">
+                <SHORT-NAME>DataIdentifier</SHORT-NAME>
+                <BYTE-POSITION>1</BYTE-POSITION>
+                <REQUEST-BYTE-POS>1</REQUEST-BYTE-POS>
+                <BYTE-LENGTH>2</BYTE-LENGTH>
+              </PARAM>
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>DataRecord</SHORT-NAME>
+                <BYTE-POSITION>3</BYTE-POSITION>
+                <DOP-REF ID-REF="dop_uint8"/>
+              </PARAM>
+            </PARAMS>
+          </POS-RESPONSE>
+
+          <POS-RESPONSE ID="pr_read_dtc">
+            <SHORT-NAME>PR_ReadDTCInformation</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>89</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>StatusOfDTC</SHORT-NAME>
+                <BYTE-POSITION>1</BYTE-POSITION>
+                <DOP-REF ID-REF="dop_status_text"/>
+              </PARAM>
+            </PARAMS>
+          </POS-RESPONSE>
+
+          <POS-RESPONSE ID="pr_session_ctrl">
+            <SHORT-NAME>PR_DiagnosticSessionControl</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>80</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>SessionType</SHORT-NAME>
+                <BYTE-POSITION>1</BYTE-POSITION>
+                <DOP-REF ID-REF="dop_uint8"/>
+              </PARAM>
+            </PARAMS>
+          </POS-RESPONSE>
+
+          <POS-RESPONSE ID="pr_all_params">
+            <SHORT-NAME>PR_AllParamTypes</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>113</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>ParamLenData</SHORT-NAME>
+                <BYTE-POSITION>1</BYTE-POSITION>
+                <DOP-REF ID-REF="dop_paramlen"/>
+              </PARAM>
+            </PARAMS>
+          </POS-RESPONSE>
+
+          <POS-RESPONSE ID="pr_complex_dops">
+            <SHORT-NAME>PR_ComplexDops</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>114</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <!-- VALUE referencing DTC-DOP -->
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>DtcData</SHORT-NAME>
+                <BYTE-POSITION>1</BYTE-POSITION>
+                <DOP-REF ID-REF="dtc_dop_main"/>
+              </PARAM>
+              <!-- VALUE referencing MUX -->
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>MuxData</SHORT-NAME>
+                <BYTE-POSITION>4</BYTE-POSITION>
+                <DOP-REF ID-REF="mux_selector"/>
+              </PARAM>
+              <!-- VALUE referencing END-OF-PDU-FIELD -->
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>EopfData</SHORT-NAME>
+                <BYTE-POSITION>10</BYTE-POSITION>
+                <DOP-REF ID-REF="eopf_items"/>
+              </PARAM>
+              <!-- VALUE referencing STATIC-FIELD -->
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>StaticFieldData</SHORT-NAME>
+                <BYTE-POSITION>20</BYTE-POSITION>
+                <DOP-REF ID-REF="sf_fixed_items"/>
+              </PARAM>
+              <!-- VALUE referencing DYNAMIC-LENGTH-FIELD -->
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>DynLenData</SHORT-NAME>
+                <BYTE-POSITION>30</BYTE-POSITION>
+                <DOP-REF ID-REF="dlf_dynamic"/>
+              </PARAM>
+              <!-- VALUE referencing ENV-DATA-DESC -->
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>EnvDescData</SHORT-NAME>
+                <BYTE-POSITION>40</BYTE-POSITION>
+                <DOP-REF ID-REF="env_data_desc1"/>
+              </PARAM>
+              <!-- VALUE referencing MIN-MAX-LENGTH-TYPE DOP (dop_varstring) -->
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>VarStringData</SHORT-NAME>
+                <BYTE-POSITION>50</BYTE-POSITION>
+                <DOP-REF ID-REF="dop_varstring"/>
+              </PARAM>
+              <!-- VALUE referencing LEADING-LENGTH-INFO-TYPE DOP -->
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>LeadingLenData</SHORT-NAME>
+                <BYTE-POSITION>60</BYTE-POSITION>
+                <DOP-REF ID-REF="dop_leading_len"/>
+              </PARAM>
+              <!-- VALUE referencing LINEAR compu method DOP -->
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>LinearData</SHORT-NAME>
+                <BYTE-POSITION>70</BYTE-POSITION>
+                <DOP-REF ID-REF="dop_linear_temp"/>
+              </PARAM>
+              <!-- VALUE referencing RAT-FUNC compu method DOP -->
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>RatFuncData</SHORT-NAME>
+                <BYTE-POSITION>72</BYTE-POSITION>
+                <DOP-REF ID-REF="dop_ratfunc"/>
+              </PARAM>
+              <!-- VALUE referencing DOP with COMPU-INVERSE-VALUE -->
+              <PARAM xsi:type="VALUE" SEMANTIC="DATA">
+                <SHORT-NAME>InverseData</SHORT-NAME>
+                <BYTE-POSITION>74</BYTE-POSITION>
+                <DOP-REF ID-REF="dop_with_inverse"/>
+              </PARAM>
+            </PARAMS>
+          </POS-RESPONSE>
+        </POS-RESPONSES>
+
+        <!-- Negative Responses -->
+        <NEG-RESPONSES>
+          <NEG-RESPONSE ID="nr_general">
+            <SHORT-NAME>NR_General</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>127</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <PARAM xsi:type="MATCHING-REQUEST-PARAM">
+                <SHORT-NAME>RequestSID</SHORT-NAME>
+                <BYTE-POSITION>1</BYTE-POSITION>
+                <REQUEST-BYTE-POS>0</REQUEST-BYTE-POS>
+                <BYTE-LENGTH>1</BYTE-LENGTH>
+              </PARAM>
+              <PARAM xsi:type="NRC-CONST">
+                <SHORT-NAME>NRC</SHORT-NAME>
+                <BYTE-POSITION>2</BYTE-POSITION>
+                <CODED-VALUES>
+                  <CODED-VALUE>18</CODED-VALUE>
+                  <CODED-VALUE>19</CODED-VALUE>
+                  <CODED-VALUE>49</CODED-VALUE>
+                </CODED-VALUES>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+            </PARAMS>
+          </NEG-RESPONSE>
+        </NEG-RESPONSES>
+
+        <!-- Global Negative Responses -->
+        <GLOBAL-NEG-RESPONSES>
+          <GLOBAL-NEG-RESPONSE ID="gnr_busy">
+            <SHORT-NAME>GNR_Busy</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>127</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <PARAM xsi:type="NRC-CONST">
+                <SHORT-NAME>BusyNRC</SHORT-NAME>
+                <BYTE-POSITION>2</BYTE-POSITION>
+                <CODED-VALUES>
+                  <CODED-VALUE>33</CODED-VALUE>
+                </CODED-VALUES>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+            </PARAMS>
+          </GLOBAL-NEG-RESPONSE>
+        </GLOBAL-NEG-RESPONSES>
+
+        <!-- Communication Parameter References (triggers COMPARAM/PROTOCOL/UNIT chain) -->
+        <COMPARAM-REFS>
+          <COMPARAM-REF ID-REF="cp_timeout" DOCREF="CANParameters" DOCTYPE="COMPARAM-SUBSET">
+            <SIMPLE-VALUE>3000</SIMPLE-VALUE>
+            <PROTOCOL-SNREF SHORT-NAME="UDS_on_CAN"/>
+            <PROT-STACK-SNREF SHORT-NAME="UDS_CAN_Stack"/>
+          </COMPARAM-REF>
+          <COMPARAM-REF ID-REF="ccp_timing" DOCREF="CANParameters" DOCTYPE="COMPARAM-SUBSET">
+            <COMPLEX-VALUE>
+              <SIMPLE-VALUE>100</SIMPLE-VALUE>
+            </COMPLEX-VALUE>
+            <PROTOCOL-SNREF SHORT-NAME="UDS_on_CAN"/>
+          </COMPARAM-REF>
+        </COMPARAM-REFS>
+
+        <!-- Base Variant Pattern for identification -->
+        <BASE-VARIANT-PATTERN>
+          <MATCHING-BASE-VARIANT-PARAMETERS>
+            <MATCHING-BASE-VARIANT-PARAMETER>
+              <EXPECTED-VALUE>SynthECU_1.0</EXPECTED-VALUE>
+              <USE-PHYSICAL-ADDRESSING>true</USE-PHYSICAL-ADDRESSING>
+              <DIAG-COMM-SNREF SHORT-NAME="ReadDataByIdentifier"/>
+              <OUT-PARAM-IF-SNREF SHORT-NAME="DataRecord"/>
+            </MATCHING-BASE-VARIANT-PARAMETER>
+          </MATCHING-BASE-VARIANT-PARAMETERS>
+        </BASE-VARIANT-PATTERN>
+
+        <PARENT-REFS>
+          <PARENT-REF xsi:type="PROTOCOL-REF" ID-REF="proto_uds" DOCREF="ProtocolContainer" DOCTYPE="LAYER"/>
+        </PARENT-REFS>
+
+      </BASE-VARIANT>
+    </BASE-VARIANTS>
+  </DIAG-LAYER-CONTAINER>
+</ODX>

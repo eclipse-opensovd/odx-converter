@@ -59,7 +59,6 @@ import schema.odx.VALUE
 import kotlin.test.Test
 
 class EnumConverterTest {
-
     @Test
     fun `TRANSMODE maps to TransmissionMode correctly`() {
         assertThat(TRANSMODE.RECEIVE_ONLY.toFileFormatEnum()).isEqualTo(TransmissionMode.RECEIVE_ONLY)

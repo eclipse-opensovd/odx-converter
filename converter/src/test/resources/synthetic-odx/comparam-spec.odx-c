@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Synthetic ODX file for integration testing.
+  Contains a COMPARAM-SPEC with protocol stack definitions.
+-->
+<ODX MODEL-VERSION="2.2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <COMPARAM-SPEC ID="cs_uds_can">
+    <SHORT-NAME>UDS_CAN_Spec</SHORT-NAME>
+    <PROT-STACKS>
+      <PROT-STACK ID="ps_uds_can">
+        <SHORT-NAME>UDS_CAN_Stack</SHORT-NAME>
+        <PDU-PROTOCOL-TYPE>UDS</PDU-PROTOCOL-TYPE>
+        <PHYSICAL-LINK-TYPE>CAN</PHYSICAL-LINK-TYPE>
+        <COMPARAM-SUBSET-REFS>
+          <COMPARAM-SUBSET-REF ID-REF="cps_can_params" DOCREF="CANParameters" DOCTYPE="COMPARAM-SUBSET"/>
+        </COMPARAM-SUBSET-REFS>
+      </PROT-STACK>
+    </PROT-STACKS>
+  </COMPARAM-SPEC>
+</ODX>

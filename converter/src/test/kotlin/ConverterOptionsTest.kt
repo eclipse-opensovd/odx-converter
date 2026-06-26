@@ -15,12 +15,11 @@ import assertk.assertThat
 import assertk.assertions.isEmpty
 import assertk.assertions.isEqualTo
 import assertk.assertions.isFalse
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 
 class ConverterOptionsTest {
-
     @Test
     fun `default values are correct`() {
         val options = ConverterOptions()
@@ -40,14 +39,16 @@ class ConverterOptionsTest {
 
     @Test
     fun `serialization roundtrip with custom values`() {
-        val options = ConverterOptions(
-            lenient = true,
-            includeJobFiles = true,
-            partialJobFiles = listOf(
-                PartialFilePattern(jobFilePattern = ".*\\.jar", includePattern = ".*\\.class")
-            ),
-            withAudiences = listOf("AfterSales", "Development"),
-        )
+        val options =
+            ConverterOptions(
+                lenient = true,
+                includeJobFiles = true,
+                partialJobFiles =
+                    listOf(
+                        PartialFilePattern(jobFilePattern = ".*\\.jar", includePattern = ".*\\.class"),
+                    ),
+                withAudiences = listOf("AfterSales", "Development"),
+            )
         val json = Json.encodeToString(options)
         val decoded = Json.decodeFromString<ConverterOptions>(json)
         assertThat(decoded).isEqualTo(options)
@@ -70,10 +71,11 @@ class ConverterOptionsTest {
 
     @Test
     fun `PartialJobFilePattern serialization roundtrip`() {
-        val pattern = PartialJobFilePattern(
-            jobFileName = "test.jar",
-            partialFilePattern = PartialFilePattern(jobFilePattern = "test.*", includePattern = ".*\\.py")
-        )
+        val pattern =
+            PartialJobFilePattern(
+                jobFileName = "test.jar",
+                partialFilePattern = PartialFilePattern(jobFilePattern = "test.*", includePattern = ".*\\.py"),
+            )
         val json = Json.encodeToString(pattern)
         val decoded = Json.decodeFromString<PartialJobFilePattern>(json)
         assertThat(decoded).isEqualTo(pattern)

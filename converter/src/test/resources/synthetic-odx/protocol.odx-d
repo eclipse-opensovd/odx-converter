@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Synthetic ODX file for integration testing.
+  Contains a PROTOCOL layer with COMPARAM references.
+-->
+<ODX MODEL-VERSION="2.2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <DIAG-LAYER-CONTAINER ID="dlc_protocol">
+    <SHORT-NAME>ProtocolContainer</SHORT-NAME>
+    <PROTOCOLS>
+      <PROTOCOL ID="proto_base">
+        <SHORT-NAME>BaseProtocol</SHORT-NAME>
+      </PROTOCOL>
+      <PROTOCOL ID="proto_uds">
+        <SHORT-NAME>UDS_on_CAN</SHORT-NAME>
+        <LONG-NAME>UDS on CAN Protocol</LONG-NAME>
+        <COMPARAM-REFS>
+          <COMPARAM-REF ID-REF="cp_timeout" DOCREF="CANParameters" DOCTYPE="COMPARAM-SUBSET"/>
+        </COMPARAM-REFS>
+        <COMPARAM-SPEC-REF ID-REF="cs_uds_can" DOCREF="UDS_CAN_Spec" DOCTYPE="COMPARAM-SPEC"/>
+        <PROT-STACK-SNREF SHORT-NAME="UDS_CAN_Stack"/>
+        <PARENT-REFS>
+          <PARENT-REF ID-REF="proto_base" DOCTYPE="LAYER"
+                       xsi:type="PROTOCOL-REF"/>
+        </PARENT-REFS>
+      </PROTOCOL>
+    </PROTOCOLS>
+  </DIAG-LAYER-CONTAINER>
+</ODX>

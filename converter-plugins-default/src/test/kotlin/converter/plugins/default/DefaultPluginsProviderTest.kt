@@ -19,7 +19,6 @@ import assertk.assertions.isInstanceOf
 import kotlin.test.Test
 
 class DefaultPluginsProviderTest {
-
     @Test
     fun `getPlugins returns list with single CompressionPlugin`() {
         val provider = DefaultPluginsProvider()
