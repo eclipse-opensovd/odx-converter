@@ -68,6 +68,17 @@ class Variant : Table() {
         get() {
             val o = __offset(10); return if (o != 0) __vector_len(o) else 0
         }
+    val revision : String?
+        get() {
+            val o = __offset(12)
+            return if (o != 0) {
+                __string(o + bb_pos)
+            } else {
+                null
+            }
+        }
+    val revisionAsByteBuffer : ByteBuffer get() = __vector_as_bytebuffer(12, 1)
+    fun revisionInByteBuffer(_bb: ByteBuffer) : ByteBuffer = __vector_in_bytebuffer(_bb, 12, 1)
     companion object {
         fun validateVersion() = Constants.FLATBUFFERS_25_9_23()
         fun getRootAsVariant(_bb: ByteBuffer): Variant = getRootAsVariant(_bb, Variant())
@@ -75,15 +86,16 @@ class Variant : Table() {
             _bb.order(ByteOrder.LITTLE_ENDIAN)
             return (obj.__assign(_bb.getInt(_bb.position()) + _bb.position(), _bb))
         }
-        fun createVariant(builder: FlatBufferBuilder, diagLayerOffset: Int, isBaseVariant: Boolean, variantPatternOffset: Int, parentRefsOffset: Int) : Int {
-            builder.startTable(4)
+        fun createVariant(builder: FlatBufferBuilder, diagLayerOffset: Int, isBaseVariant: Boolean, variantPatternOffset: Int, parentRefsOffset: Int, revisionOffset: Int) : Int {
+            builder.startTable(5)
+            addRevision(builder, revisionOffset)
             addParentRefs(builder, parentRefsOffset)
             addVariantPattern(builder, variantPatternOffset)
             addDiagLayer(builder, diagLayerOffset)
             addIsBaseVariant(builder, isBaseVariant)
             return endVariant(builder)
         }
-        fun startVariant(builder: FlatBufferBuilder) = builder.startTable(4)
+        fun startVariant(builder: FlatBufferBuilder) = builder.startTable(5)
         fun addDiagLayer(builder: FlatBufferBuilder, diagLayer: Int) = builder.addOffset(0, diagLayer, 0)
         fun addIsBaseVariant(builder: FlatBufferBuilder, isBaseVariant: Boolean) = builder.addBoolean(1, isBaseVariant, false)
         fun addVariantPattern(builder: FlatBufferBuilder, variantPattern: Int) = builder.addOffset(2, variantPattern, 0)
@@ -104,6 +116,7 @@ class Variant : Table() {
             return builder.endVector()
         }
         fun startParentRefsVector(builder: FlatBufferBuilder, numElems: Int) = builder.startVector(4, numElems, 4)
+        fun addRevision(builder: FlatBufferBuilder, revision: Int) = builder.addOffset(4, revision, 0)
         fun endVariant(builder: FlatBufferBuilder) : Int {
             val o = builder.endTable()
             return o

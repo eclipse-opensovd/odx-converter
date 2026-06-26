@@ -21,6 +21,7 @@ import schema.odx.COMPLEXCOMPARAM
 import schema.odx.DIAGSERVICE
 import schema.odx.DOPBASE
 import schema.odx.DTC
+import schema.odx.ECUSHAREDDATA
 import schema.odx.ECUVARIANT
 import schema.odx.ENVDATA
 import schema.odx.FUNCTCLASS
@@ -51,6 +52,18 @@ import java.util.IdentityHashMap
 import java.util.logging.Logger
 
 /**
+ * A single ECU within the diagnostic description, identified by its BASE-VARIANT.
+ * The ECU-VARIANTs are the variants whose PARENT-REF chain resolves back to
+ * [baseVariant].
+ */
+class EcuGroup(
+    val name: String,
+    val revision: String?,
+    val baseVariant: BASEVARIANT,
+    val ecuVariants: List<ECUVARIANT>,
+)
+
+/**
  * Aggregates multiple [ODXCollection] instances (one per ODX file) and provides
  * cross-file merged views of all IDs and objects.
  */
@@ -61,65 +74,100 @@ class ODXCollectionGroup(
     private val logger: Logger,
     private val linkOwnership: IdentityHashMap<Any, String>,
 ) {
-    // Individual per-file collections, keyed by the container short-name.
+    // Individual per-file collections, keyed by the source filename. Keying by
+    // file (rather than container short-name) keeps collections distinct even
+    // when multiple merged PDX files contain containers with the same short-name.
     val collections: Map<String, ODXCollection> by lazy {
-        data.values
-            .map { ODXCollection(it) }
-            .associateBy { it.containerKey }
+        data.mapValues { (_, odx) -> ODXCollection(odx) }
+    }
+
+    // Secondary index by container short-name, used to resolve explicit docref
+    // attributes (a docref references a container by its short-name, not a file).
+    private val collectionsByContainer: Map<String, ODXCollection> by lazy {
+        collections.values.associateBy { it.containerKey }
     }
 
     // Maps source filename to the ODXCollection created from that file.
     private val fileToCollection: Map<String, ODXCollection> by lazy {
-        data.entries.associate { (filename, odx) ->
-            filename to collections.values.first { it.odx === odx }
+        collections
+    }
+
+    /**
+     * All ECUs in this description, one per BASE-VARIANT. ECU-VARIANTs are
+     * grouped to the BASE-VARIANT their PARENT-REF chain resolves to.
+     */
+    val ecuGroups: List<EcuGroup> by lazy {
+        // Resolve each ECU-VARIANT to its owning BASE-VARIANT (walking parent
+        // chains, since an ECU-VARIANT may have another ECU-VARIANT as parent).
+        val variantsByBase = LinkedHashMap<BASEVARIANT, MutableList<ECUVARIANT>>()
+        basevariants.forEach { variantsByBase[it] = mutableListOf() }
+
+        ecuvariants.forEach { ecuVariant ->
+            val base = resolveOwningBaseVariant(ecuVariant)
+            if (base != null) {
+                variantsByBase.getOrPut(base) { mutableListOf() }.add(ecuVariant)
+            } else {
+                val fallback = basevariants.firstOrNull()
+                if (fallback == null || !options.lenient) {
+                    error("Could not determine BASE-VARIANT for ECU-VARIANT ${ecuVariant.shortname}")
+                }
+                logger.warning(
+                    "Could not determine BASE-VARIANT for ECU-VARIANT ${ecuVariant.shortname}, " +
+                        "attaching to ${fallback.shortname}",
+                )
+                variantsByBase.getValue(fallback).add(ecuVariant)
+            }
+        }
+
+        variantsByBase.map { (base, variants) ->
+            EcuGroup(
+                name = base.shortname,
+                revision = revisionFor(base),
+                baseVariant = base,
+                ecuVariants = variants,
+            )
         }
     }
 
-    val ecuName: String by lazy {
-        val ecuName =
-            baseVariantODX
-                ?.diaglayercontainer
-                ?.basevariants
-                ?.basevariant
-                ?.firstOrNull()
-                ?.shortname
-        ecuName
-            ?: if (functionalGroupODX != null) {
-                "functional_groups"
-            } else {
-                error("No base variant")
+    val ecuNames: List<String> by lazy { ecuGroups.map { it.name } }
+
+    /**
+     * Walks the PARENT-REF chain of [start] until a BASE-VARIANT is reached.
+     * Returns null if no BASE-VARIANT can be found (guards against cycles).
+     */
+    private fun resolveOwningBaseVariant(start: ECUVARIANT): BASEVARIANT? {
+        var current: Any = start
+        val visited = HashSet<Any>()
+        while (visited.add(current)) {
+            val parentRefs =
+                when (current) {
+                    is ECUVARIANT -> current.parentrefs?.parentref
+                    is BASEVARIANT -> return current
+                    else -> null
+                } ?: return null
+            val parent =
+                parentRefs
+                    .asSequence()
+                    .mapNotNull { resolveParent(it) }
+                    .firstOrNull { it is BASEVARIANT || it is ECUVARIANT }
+                    ?: return null
+            if (parent is BASEVARIANT) {
+                return parent
             }
+            current = parent
+        }
+        return null
     }
 
-    val odxRevision: String? by lazy {
-        baseVariantODX
-            ?.diaglayercontainer
+    /** Latest doc-revision label of the container that the given diag layer was parsed from. */
+    private fun revisionFor(layer: Any): String? =
+        collectionFor(layer)
+            ?.diagLayerContainer
             ?.admindata
             ?.docrevisions
             ?.docrevision
             ?.lastOrNull()
             ?.revisionlabel
-            ?: functionalGroupODX
-                ?.diaglayercontainer
-                ?.admindata
-                ?.docrevisions
-                ?.docrevision
-                ?.lastOrNull()
-                ?.revisionlabel
-    }
-
-    val baseVariantODX: ODX? by lazy {
-        data.values.firstOrNull { it.diaglayercontainer?.basevariants?.basevariant != null }
-    }
-
-    val functionalGroupODX: ODX? by lazy {
-        data.values.firstOrNull {
-            it.diaglayercontainer
-                ?.functionalgroups
-                ?.functionalgroup
-                ?.isNotEmpty() == true
-        }
-    }
 
     val basevariants: List<BASEVARIANT> by lazy {
         collections.values.flatMap { it.basevariants.values }
@@ -131,6 +179,10 @@ class ODXCollectionGroup(
 
     val functionalGroups: List<FUNCTIONALGROUP> by lazy {
         collections.values.flatMap { it.functionalGroups.values }
+    }
+
+    val ecuSharedDatas: List<ECUSHAREDDATA> by lazy {
+        collections.values.flatMap { it.ecuSharedDatas.values }
     }
 
     val diagServices: List<DIAGSERVICE> by lazy {
@@ -165,6 +217,59 @@ class ODXCollectionGroup(
         collections.values.flatMap { it.libraries.values }
     }
 
+    // --- Code/job file scoping -------------------------------------------------
+    //
+    // When multiple PDX files are merged into a single MDD, code/job files from
+    // different PDX files may share the same in-PDX path. To keep chunk names
+    // (and the codefile references stored in the flatbuffer) unique and
+    // attributable, code file keys are prefixed with the source PDX name. For
+    // the common single-PDX case the raw codefile path is used unchanged.
+
+    /** Reverse index: ODXCollection identity -> its source file key. */
+    private val fileKeyForCollection: IdentityHashMap<ODXCollection, String> by lazy {
+        IdentityHashMap<ODXCollection, String>().apply {
+            collections.forEach { (fileKey, collection) -> put(collection, fileKey) }
+        }
+    }
+
+    /** The PDX name a source file key belongs to (the prefix before [PDX_NAME_SEPARATOR]). */
+    private fun pdxNameForFileKey(fileKey: String): String = fileKey.substringBefore(PDX_NAME_SEPARATOR)
+
+    /** Whether this group aggregates ODX files originating from more than one PDX. */
+    val isMultiPdx: Boolean by lazy {
+        collections.keys
+            .map { pdxNameForFileKey(it) }
+            .distinct()
+            .size > 1
+    }
+
+    /** The PDX name the given (owning) object was parsed from, or null if unknown. */
+    fun pdxNameFor(owner: Any): String? {
+        val collection = collectionFor(owner) ?: return null
+        val fileKey = fileKeyForCollection[collection] ?: return null
+        return pdxNameForFileKey(fileKey)
+    }
+
+    /**
+     * The key used to identify a code/job file both as a chunk name and as the
+     * codefile reference stored in the flatbuffer. When merging multiple PDX
+     * files, the key is prefixed with [pdxName] to keep it unique; otherwise the
+     * raw [codeFile] path is returned unchanged.
+     */
+    fun codeFileKey(
+        pdxName: String?,
+        codeFile: String,
+    ): String =
+        if (isMultiPdx && pdxName != null) {
+            "$pdxName$CODE_FILE_SCOPE_SEPARATOR$codeFile"
+        } else {
+            codeFile
+        }
+
+    /** Pairs each [ODXCollection] with the source PDX name of its file key. */
+    fun collectionsWithPdxName(): List<Pair<ODXCollection, String>> =
+        collections.entries.map { (fileKey, collection) -> collection to pdxNameForFileKey(fileKey) }
+
     // Global short-name resolution for cross-file SNREF types (protocols, prot-stacks)
 
     fun resolveProtocolByShortName(shortName: String): PROTOCOL? = protocols.firstOrNull { it.shortname == shortName }
@@ -194,12 +299,14 @@ class ODXCollectionGroup(
         docref: String?,
         perFileAccessor: (ODXCollection) -> Map<String, T>,
     ): T? {
-        val effectiveDocref = docref ?: sourceCollectionFor(link)?.containerKey
-        if (effectiveDocref != null) {
-            val collection = collections[effectiveDocref]
-            if (collection != null) {
-                return perFileAccessor(collection)[idref]
+        val collection =
+            if (docref != null) {
+                collectionsByContainer[docref]
+            } else {
+                sourceCollectionFor(link)
             }
+        if (collection != null) {
+            return perFileAccessor(collection)[idref]
         }
         logger.warning("Could not resolve $idref: no docref and no source collection found")
         return null
@@ -262,12 +369,16 @@ class ODXCollectionGroup(
      * functionalGroups, tables, and ecuSharedDatas — scoped by docref when available.
      */
     fun resolveParent(ref: PARENTREF): Any? {
-        val effectiveDocref = ref.docref ?: sourceCollectionFor(ref)?.containerKey
-        if (effectiveDocref == null) {
+        val collection =
+            if (ref.docref != null) {
+                collectionsByContainer[ref.docref]
+            } else {
+                sourceCollectionFor(ref)
+            }
+        if (collection == null) {
             logger.warning("Could not resolve parent ${ref.idref}: no docref and no source collection found")
             return null
         }
-        val collection = collections[effectiveDocref] ?: return null
         collection.basevariants[ref.idref]?.let { return it }
         collection.ecuvariants[ref.idref]?.let { return it }
         collection.protocols[ref.idref]?.let { return it }
@@ -275,5 +386,13 @@ class ODXCollectionGroup(
         collection.tables[ref.idref]?.let { return it }
         collection.ecuSharedDatas[ref.idref]?.let { return it }
         return null
+    }
+
+    companion object {
+        /** Separates the PDX name prefix from the in-PDX entry name in ODX file keys. */
+        const val PDX_NAME_SEPARATOR = "!"
+
+        /** Separates the PDX name prefix from the codefile path in scoped code file keys. */
+        const val CODE_FILE_SCOPE_SEPARATOR = "::"
     }
 }

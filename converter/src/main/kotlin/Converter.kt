@@ -120,130 +120,175 @@ class FileConverter(
         return stat
     }
 
-    fun convert(
+    /**
+     * Parses a single already-opened PDX [zipFile] into the given accumulators.
+     * The [zipFile] must remain open until conversion finishes, because code/job
+     * file bytes are read lazily during chunk building.
+     */
+    fun parsePdx(
         inputFile: File,
-        outputFile: File,
-        options: ConverterOptions,
-        stats: MutableList<ChunkStat>,
-    ) {
-        logger.info("Converting '${inputFile.name}' to mdd")
-
-        val odxData = mutableMapOf<String, ODX>()
-
-        val inputFileData = mutableMapOf<String, ZipEntryInfos>()
-
-        val linkCollector = ODXLinkCollector()
-
-        ZipFile(inputFile).use { zipFile ->
-            val readParseFileDuration =
-                measureTime {
-                    fillInputFileData(zipFile, odxData, inputFileData, linkCollector)
-                }
-            logger.fine("Reading and parsing into objects took $readParseFileDuration")
-
-            val odxRawSize = inputFileData.filter { it.key.contains(".odx") }.map { it.value.size }.sum()
-
-            val odxCollection = ODXCollectionGroup(odxData, odxRawSize, options, logger, linkCollector.linkToFile)
-
-            if (options.withAudiences.isNotEmpty()) {
-                val validAudiences = odxCollection.additionalAudiences.map { it.shortname }
-                val invalidAudiences =
-                    options.withAudiences.filter { requested ->
-                        validAudiences.none { it.equals(requested, ignoreCase = true) }
-                    }
-                if (invalidAudiences.isNotEmpty()) {
-                    logger.warning(
-                        "The following audiences specified with --with-audience are not defined in the diagnostic description: " +
-                            "${invalidAudiences.joinToString(", ")}. Valid audiences are: ${validAudiences.joinToString(", ")}",
-                    )
-                }
-            }
-
-            var compressionDuration: Duration = Duration.ZERO
-            val plugins = retrievePlugins()
-
-            var sizeUncompressed: Long = 0
-            val writingDuration =
-                measureTime {
-                    val mddFile = MDDFile.newBuilder()
-                    mddFile.version = "2025-05-21"
-                    mddFile.ecuName = odxCollection.ecuName
-                    odxCollection.odxRevision?.let {
-                        mddFile.revision = it
-                    }
-
-                    mddFile.putMetadata("created", getCurrentTimeReproducible().toString())
-                    mddFile.putMetadata("source", inputFile.name)
-                    mddFile.putMetadata("options", Json.encodeToString(options))
-                    mddFile.putMetadata(
-                        "converter",
-                        "${ManifestReader.title} ${ManifestReader.version} (${ManifestReader.commitHash.take(7)})",
-                    )
-                    mddFile.putMetadata(
-                        "plugins",
-                        plugins.joinToString(", ") { "${it.getPluginIdentifier()}@${it.getPluginVersion()}" },
-                    )
-
-                    val pluginHandler =
-                        PluginApiHandler(mddFile, logger) { chunk, pluginApiHandler ->
-                            logger.info("Chunk '${chunk.name}' (${chunk.type}) was added by a plugin")
-                            handleAndAddChunk(chunk, plugins, pluginApiHandler, stats, mddFile)
-                        }
-
-                    plugins.forEach { plugin ->
-                        plugin.beforeProcessing(pluginHandler)
-                    }
-
-                    val chunkBuilder = ChunkBuilder()
-                    compressionDuration =
-                        measureTime {
-                            val chunk = chunkBuilder.createEcuDataChunk(logger, odxCollection, options)
-                            val stat = handleAndAddChunk(chunk, plugins, pluginHandler, stats, mddFile)
-                            stat?.rawSize = odxCollection.rawSize
-                        }
-                    val jobChunks = chunkBuilder.createJobsChunks(logger, inputFileData, odxCollection, options)
-                    jobChunks.forEach { chunk ->
-                        handleAndAddChunk(chunk, plugins, pluginHandler, stats, mddFile)
-                    }
-                    val partialChunks = chunkBuilder.createPartialChunks(logger, inputFileData, odxCollection, options)
-                    partialChunks.forEach { chunk ->
-                        handleAndAddChunk(chunk, plugins, pluginHandler, stats, mddFile)
-                    }
-
-                    plugins.forEach { plugin ->
-                        plugin.afterProcessing(pluginHandler)
-                    }
-
-                    sizeUncompressed = mddFile.chunksList.sumOf { it.uncompressedSize }
-
-                    val mddFileOut = mddFile.build()
-                    BufferedOutputStream(outputFile.outputStream()).use {
-                        it.write(FILE_MAGIC)
-                        mddFileOut.writeTo(it)
-                    }
-                }
-
-            val sizeCompressed = outputFile.toPath().fileSize()
-            logger.info(
-                "Writing database took $writingDuration total (compression: $compressionDuration) - sizes: odx raw: ${odxRawSize.format()} bytes, uncompressed chunks: ${sizeUncompressed.format()} bytes, compressed mdd: ${sizeCompressed.format()} bytes",
-            )
-        }
-    }
-
-    private fun fillInputFileData(
         zipFile: ZipFile,
         odxData: MutableMap<String, ODX>,
         inputFileData: MutableMap<String, ZipEntryInfos>,
         linkCollector: ODXLinkCollector,
     ) {
+        logger.info("Reading '${inputFile.name}'")
+        val readParseFileDuration =
+            measureTime {
+                fillInputFileData(inputFile.name, zipFile, odxData, inputFileData, linkCollector)
+            }
+        logger.fine("Reading and parsing '${inputFile.name}' into objects took $readParseFileDuration")
+    }
+
+    fun convert(
+        inputFiles: List<File>,
+        outputFile: File,
+        options: ConverterOptions,
+        stats: MutableList<ChunkStat>,
+    ) {
+        logger.info("Converting ${inputFiles.joinToString(", ") { it.name }} to ${outputFile.name}")
+
+        val odxData = mutableMapOf<String, ODX>()
+        val inputFileData = mutableMapOf<String, ZipEntryInfos>()
+        val linkCollector = ODXLinkCollector()
+
+        // Keep all PDX zip files open for the whole conversion, since code/job
+        // file bytes are read lazily during chunk building.
+        val zipFiles = inputFiles.map { ZipFile(it) }
+        try {
+            inputFiles.zip(zipFiles).forEach { (inputFile, zipFile) ->
+                parsePdx(inputFile, zipFile, odxData, inputFileData, linkCollector)
+            }
+
+            convertParsed(inputFiles, outputFile, options, stats, odxData, inputFileData, linkCollector)
+        } finally {
+            zipFiles.forEach { runCatching { it.close() } }
+        }
+    }
+
+    private fun convertParsed(
+        inputFiles: List<File>,
+        outputFile: File,
+        options: ConverterOptions,
+        stats: MutableList<ChunkStat>,
+        odxData: Map<String, ODX>,
+        inputFileData: Map<String, ZipEntryInfos>,
+        linkCollector: ODXLinkCollector,
+    ) {
+        val odxRawSize = inputFileData.filter { it.key.contains(".odx") }.map { it.value.size }.sum()
+
+        val odxCollection = ODXCollectionGroup(odxData, odxRawSize, options, logger, linkCollector.linkToFile)
+
+        if (options.withAudiences.isNotEmpty()) {
+            val validAudiences = odxCollection.additionalAudiences.map { it.shortname }
+            val invalidAudiences =
+                options.withAudiences.filter { requested ->
+                    validAudiences.none { it.equals(requested, ignoreCase = true) }
+                }
+            if (invalidAudiences.isNotEmpty()) {
+                logger.warning(
+                    "The following audiences specified with --with-audience are not defined in the diagnostic description: " +
+                        "${invalidAudiences.joinToString(", ")}. Valid audiences are: ${validAudiences.joinToString(", ")}",
+                )
+            }
+        }
+
+        var compressionDuration: Duration = Duration.ZERO
+        val plugins = retrievePlugins()
+
+        var sizeUncompressed: Long = 0
+        val writingDuration =
+            measureTime {
+                val mddFile = MDDFile.newBuilder()
+                mddFile.version = "2025-05-21"
+                mddFile.addAllEcuName(odxCollection.ecuNames)
+                odxCollection.ecuGroups.forEach { ecu ->
+                    ecu.revision?.let { mddFile.putRevision(ecu.name, it) }
+                }
+
+                mddFile.putMetadata("created", getCurrentTimeReproducible().toString())
+                mddFile.putMetadata("source", inputFiles.joinToString(", ") { it.name })
+                mddFile.putMetadata("options", Json.encodeToString(options))
+                mddFile.putMetadata(
+                    "converter",
+                    "${ManifestReader.title} ${ManifestReader.version} (${ManifestReader.commitHash.take(7)})",
+                )
+                mddFile.putMetadata(
+                    "plugins",
+                    plugins.joinToString(", ") { "${it.getPluginIdentifier()}@${it.getPluginVersion()}" },
+                )
+
+                val pluginHandler =
+                    PluginApiHandler(mddFile, logger) { chunk, pluginApiHandler ->
+                        logger.info("Chunk '${chunk.name}' (${chunk.type}) was added by a plugin")
+                        handleAndAddChunk(chunk, plugins, pluginApiHandler, stats, mddFile)
+                    }
+
+                plugins.forEach { plugin ->
+                    plugin.beforeProcessing(pluginHandler)
+                }
+
+                val chunkBuilder = ChunkBuilder()
+                compressionDuration =
+                    measureTime {
+                        val chunk = chunkBuilder.createEcuDataChunk(logger, odxCollection, options)
+                        val stat = handleAndAddChunk(chunk, plugins, pluginHandler, stats, mddFile)
+                        stat?.rawSize = odxCollection.rawSize
+                    }
+                val jobChunks = chunkBuilder.createJobsChunks(logger, inputFileData, odxCollection, options)
+                jobChunks.forEach { chunk ->
+                    handleAndAddChunk(chunk, plugins, pluginHandler, stats, mddFile)
+                }
+                val partialChunks = chunkBuilder.createPartialChunks(logger, inputFileData, odxCollection, options)
+                partialChunks.forEach { chunk ->
+                    handleAndAddChunk(chunk, plugins, pluginHandler, stats, mddFile)
+                }
+
+                plugins.forEach { plugin ->
+                    plugin.afterProcessing(pluginHandler)
+                }
+
+                sizeUncompressed = mddFile.chunksList.sumOf { it.uncompressedSize }
+
+                val mddFileOut = mddFile.build()
+                BufferedOutputStream(outputFile.outputStream()).use {
+                    it.write(FILE_MAGIC)
+                    mddFileOut.writeTo(it)
+                }
+            }
+
+        val sizeCompressed = outputFile.toPath().fileSize()
+        logger.info(
+            "Writing database took $writingDuration total (compression: $compressionDuration) - sizes: odx raw: ${odxRawSize.format()} bytes, uncompressed chunks: ${sizeUncompressed.format()} bytes, compressed mdd: ${sizeCompressed.format()} bytes",
+        )
+    }
+
+    private fun fillInputFileData(
+        pdxName: String,
+        zipFile: ZipFile,
+        odxData: MutableMap<String, ODX>,
+        inputFileData: MutableMap<String, ZipEntryInfos>,
+        linkCollector: ODXLinkCollector,
+    ) {
+        // Collect this PDX's ODX entries separately so that, when accumulating
+        // across multiple PDX files, we only (re)parse the entries of this file.
+        val odxEntryKeys = mutableListOf<Pair<String, ZipEntryInfos>>()
         zipFile.entries().toList().forEach { entry ->
             if (entry.isDirectory) {
                 return@forEach
             }
-            inputFileData[entry.name] =
+            val infos =
                 ZipEntryInfos(
                     size = entry.size,
                 ) { zipFile.getInputStream(entry) }
+            // Prefix all entry keys with the PDX name so that code/job files with
+            // the same in-PDX path coming from different PDX files don't overwrite
+            // each other when merging into a single output.
+            val entryKey = "$pdxName${ODXCollectionGroup.PDX_NAME_SEPARATOR}${entry.name}"
+            inputFileData[entryKey] = infos
+            if (entry.name.contains(".odx")) {
+                odxEntryKeys.add(entry.name to infos)
+            }
         }
 
         val unmarshaller = context.createUnmarshaller()
@@ -265,20 +310,20 @@ class FileConverter(
                 true // keep going
             }
 
-        inputFileData.forEach { entry ->
-            if (!entry.key.contains(".odx")) {
-                return@forEach
-            }
-            linkCollector.currentFile = entry.key
+        odxEntryKeys.forEach { (entryName, infos) ->
+            // Prefix with the PDX name to keep ODX keys globally unique when
+            // multiple PDX files are merged into a single output.
+            val odxKey = "$pdxName${ODXCollectionGroup.PDX_NAME_SEPARATOR}$entryName"
+            linkCollector.currentFile = odxKey
             val odx =
-                entry.value.inputStream.invoke().use {
+                infos.inputStream.invoke().use {
                     unmarshaller
                         .unmarshal(
                             XMLInputFactory.newFactory().createXMLEventReader(it),
                             ODX::class.java,
                         ).value
                 }
-            odxData[entry.key] = odx
+            odxData[odxKey] = odx
         }
 
         if (hadParseErrors) {
@@ -342,18 +387,97 @@ class Converter : CliktCommand(name = "odx-converter") {
                 "included if at least one of the audience entries matches",
         ).multiple()
 
+    val singleFileName: String? by option("--single-file-name")
+        .help(
+            "Combine all input pdx files into a single mdd with the given name (without extension), " +
+                "containing multiple ECUs. The output is written to the output directory (or the first " +
+                "pdx file's directory if not set).",
+        )
+
     private var hadErrors: Boolean = false
     private val context: JAXBContext =
         org.eclipse.persistence.jaxb.JAXBContextFactory
             .createContext(arrayOf(ODX::class.java), null)
 
-    private fun createConsoleLogHandler(fileName: String): StreamHandler? {
-        if (pdxFiles.size == 1) {
+    private fun createConsoleLogHandler(
+        fileName: String,
+        singleJob: Boolean,
+    ): StreamHandler? {
+        if (singleJob) {
             return ConsoleHandlerWithFile(Level.INFO, null)
         } else if (logOnConsole) {
             return ConsoleHandlerWithFile(Level.INFO, fileName)
         }
         return null
+    }
+
+    private fun buildOptions(): ConverterOptions =
+        ConverterOptions(
+            lenient = this.lenient,
+            includeJobFiles = this.includeJobFiles,
+            partialJobFiles =
+                this.partialJobFiles.map {
+                    PartialFilePattern(
+                        it.first,
+                        it.second,
+                    )
+                },
+            withAudiences = withAudiences,
+        )
+
+    /**
+     * Converts the given input PDX files into a single MDD named [outputBaseName].mdd
+     * in [outputDir]. Runs on the calling thread.
+     *
+     * @param singleJob whether this is the only conversion job (controls console logging)
+     */
+    private fun runConversion(
+        inputFiles: List<File>,
+        outputBaseName: String,
+        outputDir: File,
+        stats: MutableList<ChunkStat>,
+        singleJob: Boolean,
+    ) {
+        val fileLogLevel = logLevel ?: Level.INFO
+        val label = inputFiles.joinToString(", ") { it.name }
+        try {
+            println("Processing $label")
+            val duration =
+                measureTime {
+                    val logger = Logger.getLogger(outputBaseName)
+                    val logFile = File(outputDir, "$outputBaseName.mdd.log")
+
+                    WriteToFileHandler(
+                        fileLogLevel,
+                        logFile,
+                    ).use { handler ->
+                        logger.level = fileLogLevel
+                        logger.useParentHandlers = false
+                        logger.addHandler(handler)
+
+                        val consoleHandler = createConsoleLogHandler(label, singleJob)
+                        consoleHandler?.let {
+                            logger.addHandler(it)
+                        }
+                        try {
+                            val outFile = File(outputDir, "$outputBaseName.mdd")
+                            val converter = FileConverter(logger, context)
+                            converter.convert(inputFiles, outFile, buildOptions(), stats)
+                        } catch (e: Exception) {
+                            hadErrors = true
+                            logger.severe("Error while converting $label: ${e.message}", e)
+                            if (consoleHandler == null) {
+                                println("Error while processing $label: ${e.stackTraceToString()} ")
+                            }
+                        } finally {
+                            consoleHandler?.close()
+                        }
+                    }
+                }
+            println("Finished processing $label after $duration")
+        } catch (t: Throwable) {
+            t.printStackTrace()
+        }
     }
 
     override fun run() {
@@ -369,68 +493,35 @@ class Converter : CliktCommand(name = "odx-converter") {
             System.err.println("Invalid parallel value: $parallel, must be greater than 0")
             exitProcess(-1)
         }
-        val executors = Executors.newFixedThreadPool(parallel)
-        // sort by descending file size as a rough guesstimate of processing time
-        pdxFiles.forEach { inputFile ->
-            val outputDir = outputDir ?: inputFile.parentFile
+        if (pdxFiles.isEmpty()) {
+            System.err.println("No pdx files given")
+            exitProcess(-1)
+        }
 
-            val fileLogLevel = logLevel ?: Level.INFO
-            executors.submit {
-                try {
-                    println("Processing ${inputFile.name}")
-                    val duration =
-                        measureTime {
-                            val logger = Logger.getLogger(inputFile.name)
-                            val logFile = File(outputDir, "${inputFile.nameWithoutExtension}.mdd.log")
-
-                            WriteToFileHandler(
-                                fileLogLevel,
-                                logFile,
-                            ).use { handler ->
-                                logger.level = fileLogLevel
-                                logger.useParentHandlers = false
-                                logger.addHandler(handler)
-
-                                val consoleHandler = createConsoleLogHandler(inputFile.name)
-                                consoleHandler?.let {
-                                    logger.addHandler(it)
-                                }
-                                try {
-                                    val outFile = File(outputDir, "${inputFile.nameWithoutExtension}.mdd")
-                                    val options =
-                                        ConverterOptions(
-                                            lenient = this.lenient,
-                                            includeJobFiles = this.includeJobFiles,
-                                            partialJobFiles =
-                                                this.partialJobFiles.map {
-                                                    PartialFilePattern(
-                                                        it.first,
-                                                        it.second,
-                                                    )
-                                                },
-                                            withAudiences = withAudiences,
-                                        )
-                                    val converter = FileConverter(logger, context)
-                                    converter.convert(inputFile, outFile, options, stats)
-                                } catch (e: Exception) {
-                                    hadErrors = true
-                                    logger.severe("Error while converting file ${inputFile.name}: ${e.message}", e)
-                                    if (consoleHandler == null) {
-                                        println("Error while processing ${inputFile.name}: ${e.stackTraceToString()} ")
-                                    }
-                                } finally {
-                                    consoleHandler?.close()
-                                }
-                            }
-                        }
-                    println("Finished processing ${inputFile.name} after $duration")
-                } catch (t: Throwable) {
-                    t.printStackTrace()
+        val singleName = singleFileName
+        if (singleName != null) {
+            // Merge all input PDX files into a single MDD with multiple ECUs.
+            val targetDir = outputDir ?: pdxFiles.first().absoluteFile.parentFile
+            runConversion(pdxFiles, singleName, targetDir, stats, singleJob = true)
+        } else {
+            val executors = Executors.newFixedThreadPool(parallel)
+            // sort by descending file size as a rough guesstimate of processing time
+            pdxFiles.forEach { inputFile ->
+                val targetDir = outputDir ?: inputFile.absoluteFile.parentFile
+                executors.submit {
+                    runConversion(
+                        listOf(inputFile),
+                        inputFile.nameWithoutExtension,
+                        targetDir,
+                        stats,
+                        singleJob = pdxFiles.size == 1,
+                    )
                 }
             }
+            executors.shutdown()
+            executors.awaitTermination(1, TimeUnit.HOURS)
         }
-        executors.shutdown()
-        executors.awaitTermination(1, TimeUnit.HOURS)
+
         if (hadErrors) {
             exitProcess(1)
         }
