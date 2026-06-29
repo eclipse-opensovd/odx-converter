@@ -68,6 +68,43 @@ class ODXCollectionGroup(
             .associateBy { it.containerKey }
     }
 
+    /**
+     * Secondary index: maps each **layer** short-name (base-variant,
+     * ecu-variant, protocol, functional-group, ecu-shared-data) to the
+     * [ODXCollection] that contains it.
+     *
+     * ODX references with `DOCTYPE=LAYER` use the layer's own short-name as
+     * `DOCREF`, which differs from the top-level container short-name that
+     * [collections] is keyed by.
+     */
+    private val layerNameToCollection: Map<String, ODXCollection> by lazy {
+        collections.values
+            .flatMap { collection ->
+                (
+                    collection.basevariants.values.map { it.shortname to collection } +
+                        collection.ecuvariants.values.map { it.shortname to collection } +
+                        collection.protocols.values.map { it.shortname to collection } +
+                        collection.functionalGroups.values.map { it.shortname to collection } +
+                        collection.ecuSharedDatas.values.map { it.shortname to collection }
+                )
+            }.groupBy({ it.first }, { it.second })
+            .onEach { (shortName, owners) ->
+                if (owners.size > 1) {
+                    logger.warning(
+                        "Duplicate layer short-name '$shortName' found in collections: " +
+                            owners.joinToString(", ") { it.containerKey },
+                    )
+                }
+            }.mapValues { (_, owners) -> owners.first() }
+    }
+
+    /**
+     * Resolves a `DOCREF` string to the owning [ODXCollection], trying the
+     * container-level [collections] index first and falling back to the
+     * layer-level [layerNameToCollection] index (for `DOCTYPE=LAYER` refs).
+     */
+    private fun collectionForDocref(docref: String): ODXCollection? = collections[docref] ?: layerNameToCollection[docref]
+
     // Maps source filename to the ODXCollection created from that file.
     private val fileToCollection: Map<String, ODXCollection> by lazy {
         data.entries.associate { (filename, odx) ->
@@ -196,7 +233,7 @@ class ODXCollectionGroup(
     ): T? {
         val effectiveDocref = docref ?: sourceCollectionFor(link)?.containerKey
         if (effectiveDocref != null) {
-            val collection = collections[effectiveDocref]
+            val collection = collectionForDocref(effectiveDocref)
             if (collection != null) {
                 return perFileAccessor(collection)[idref]
             }
@@ -267,7 +304,15 @@ class ODXCollectionGroup(
             logger.warning("Could not resolve parent ${ref.idref}: no docref and no source collection found")
             return null
         }
-        val collection = collections[effectiveDocref] ?: return null
+        val collection = collectionForDocref(effectiveDocref)
+        if (collection == null) {
+            logger.warning(
+                "Could not resolve parent for ${ref.idref}: no collection found for docref '$effectiveDocref'. " +
+                    "Known container keys: [${collections.keys.joinToString(", ")}]. " +
+                    "Known layer short-names: [${layerNameToCollection.keys.joinToString(", ")}].",
+            )
+            return null
+        }
         collection.basevariants[ref.idref]?.let { return it }
         collection.ecuvariants[ref.idref]?.let { return it }
         collection.protocols[ref.idref]?.let { return it }
