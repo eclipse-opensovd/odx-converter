@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Synthetic ODX fixture for SNREF/TABLE-ROW-REF integration tests.
+
+  Exercises three code paths introduced in this branch:
+  1. TABLE-ROW-REF (ODXLINK) in a TABLE rowwrapper — TableA references RowB1 from TableB.
+  2. TABLE-KEY with TABLE-SNREF — service ReadWithTableSnref uses a TABLE-KEY that
+     references TableA by short-name rather than by ID-REF.
+  3. TABLE-KEY with TABLE-ROW-SNREF — service ReadWithTableRowSnref uses a TABLE-KEY that
+     references a specific TABLE-ROW by short-name.
+-->
+<ODX MODEL-VERSION="2.2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <DIAG-LAYER-CONTAINER ID="dlc_snref">
+    <SHORT-NAME>SnrefContainer</SHORT-NAME>
+    <BASE-VARIANTS>
+      <BASE-VARIANT ID="bv_snref">
+        <SHORT-NAME>SnrefECU</SHORT-NAME>
+
+        <DIAG-DATA-DICTIONARY-SPEC>
+
+          <!-- Key DOP used by both tables -->
+          <DATA-OBJECT-PROPS>
+            <DATA-OBJECT-PROP ID="dop_key">
+              <SHORT-NAME>DOP_Key</SHORT-NAME>
+              <COMPU-METHOD>
+                <CATEGORY>IDENTICAL</CATEGORY>
+              </COMPU-METHOD>
+              <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                <BIT-LENGTH>8</BIT-LENGTH>
+              </DIAG-CODED-TYPE>
+              <PHYSICAL-TYPE BASE-DATA-TYPE="A_UINT32"/>
+            </DATA-OBJECT-PROP>
+          </DATA-OBJECT-PROPS>
+
+          <TABLES>
+            <!--
+              TableB must be declared first so its row ID is known when TableA
+              adds a TABLE-ROW-REF that points to it.
+            -->
+            <TABLE ID="table_b">
+              <SHORT-NAME>TableB</SHORT-NAME>
+              <KEY-DOP-REF ID-REF="dop_key"/>
+              <!-- RowB1 is an inline TABLE-ROW referenced by TableA via TABLE-ROW-REF -->
+              <TABLE-ROW ID="tr_b1">
+                <SHORT-NAME>RowB1</SHORT-NAME>
+                <KEY>10</KEY>
+              </TABLE-ROW>
+            </TABLE>
+
+            <!--
+              TableA has one inline TABLE-ROW (RowA1) and one TABLE-ROW-REF pointing
+              to RowB1 in TableB.  This exercises the ODXLINK branch in TABLE.offset().
+            -->
+            <TABLE ID="table_a">
+              <SHORT-NAME>TableA</SHORT-NAME>
+              <KEY-DOP-REF ID-REF="dop_key"/>
+              <TABLE-ROW ID="tr_a1">
+                <SHORT-NAME>RowA1</SHORT-NAME>
+                <KEY>1</KEY>
+              </TABLE-ROW>
+              <!-- Row reference resolved at write time via ODXCollectionGroup.resolveTableRow() -->
+              <TABLE-ROW-REF ID-REF="tr_b1"/>
+            </TABLE>
+          </TABLES>
+
+        </DIAG-DATA-DICTIONARY-SPEC>
+
+        <DIAG-COMMS>
+
+          <!--
+            Service 1: TABLE-KEY references TableA by short-name (TABLE-SNREF).
+            This exercises the TABLE-SNREF branch in TABLEKEY.offset().
+          -->
+          <DIAG-SERVICE ID="ds_snref_table" SEMANTIC="DATA" ADDRESSING="PHYSICAL"
+                        TRANSMISSION-MODE="SEND-AND-RECEIVE">
+            <SHORT-NAME>ReadWithTableSnref</SHORT-NAME>
+            <REQUEST-REF ID-REF="req_snref_table"/>
+            <POS-RESPONSE-REFS>
+              <POS-RESPONSE-REF ID-REF="pr_snref_table"/>
+            </POS-RESPONSE-REFS>
+          </DIAG-SERVICE>
+
+          <!--
+            Service 2: TABLE-KEY references RowA1 by short-name (TABLE-ROW-SNREF).
+            This exercises the TABLE-ROW-SNREF branch in TABLEKEY.offset().
+          -->
+          <DIAG-SERVICE ID="ds_snref_row" SEMANTIC="DATA" ADDRESSING="PHYSICAL"
+                        TRANSMISSION-MODE="SEND-AND-RECEIVE">
+            <SHORT-NAME>ReadWithTableRowSnref</SHORT-NAME>
+            <REQUEST-REF ID-REF="req_snref_row"/>
+            <POS-RESPONSE-REFS>
+              <POS-RESPONSE-REF ID-REF="pr_snref_row"/>
+            </POS-RESPONSE-REFS>
+          </DIAG-SERVICE>
+
+        </DIAG-COMMS>
+
+        <REQUESTS>
+
+          <!-- Request for ReadWithTableSnref -->
+          <REQUEST ID="req_snref_table">
+            <SHORT-NAME>RQ_SnrefTable</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>200</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <!-- TABLE-KEY referencing TableA by SNREF -->
+              <PARAM xsi:type="TABLE-KEY" ID="tk_table_snref">
+                <SHORT-NAME>KeyByTableSnref</SHORT-NAME>
+                <BYTE-POSITION>1</BYTE-POSITION>
+                <TABLE-SNREF SHORT-NAME="TableA"/>
+              </PARAM>
+              <PARAM xsi:type="TABLE-STRUCT">
+                <SHORT-NAME>StructForTableSnrefKey</SHORT-NAME>
+                <BYTE-POSITION>2</BYTE-POSITION>
+                <TABLE-KEY-SNREF SHORT-NAME="KeyByTableSnref"/>
+              </PARAM>
+            </PARAMS>
+          </REQUEST>
+
+          <!-- Request for ReadWithTableRowSnref -->
+          <REQUEST ID="req_snref_row">
+            <SHORT-NAME>RQ_SnrefRow</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>201</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <!-- TABLE-KEY referencing RowA1 by SNREF -->
+              <PARAM xsi:type="TABLE-KEY" ID="tk_row_snref">
+                <SHORT-NAME>KeyByRowSnref</SHORT-NAME>
+                <BYTE-POSITION>1</BYTE-POSITION>
+                <TABLE-ROW-SNREF SHORT-NAME="RowA1"/>
+              </PARAM>
+              <PARAM xsi:type="TABLE-STRUCT">
+                <SHORT-NAME>StructForRowSnrefKey</SHORT-NAME>
+                <BYTE-POSITION>2</BYTE-POSITION>
+                <TABLE-KEY-SNREF SHORT-NAME="KeyByRowSnref"/>
+              </PARAM>
+            </PARAMS>
+          </REQUEST>
+
+        </REQUESTS>
+
+        <POS-RESPONSES>
+
+          <POS-RESPONSE ID="pr_snref_table">
+            <SHORT-NAME>PR_SnrefTable</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>201</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+            </PARAMS>
+          </POS-RESPONSE>
+
+          <POS-RESPONSE ID="pr_snref_row">
+            <SHORT-NAME>PR_SnrefRow</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>202</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+            </PARAMS>
+          </POS-RESPONSE>
+
+        </POS-RESPONSES>
+
+      </BASE-VARIANT>
+    </BASE-VARIANTS>
+  </DIAG-LAYER-CONTAINER>
+</ODX>

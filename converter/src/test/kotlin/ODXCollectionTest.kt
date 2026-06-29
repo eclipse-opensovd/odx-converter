@@ -32,6 +32,7 @@ import schema.odx.ECUVARIANTS
 import schema.odx.FUNCTIONALGROUP
 import schema.odx.FUNCTIONALGROUPS
 import schema.odx.ODX
+import schema.odx.ODXLINK
 import schema.odx.PROTOCOL
 import schema.odx.PROTOCOLS
 import schema.odx.REQUEST
@@ -39,6 +40,9 @@ import schema.odx.REQUESTS
 import schema.odx.SINGLEECUJOB
 import schema.odx.STRUCTURE
 import schema.odx.STRUCTURES
+import schema.odx.TABLE
+import schema.odx.TABLEROW
+import schema.odx.TABLES
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
@@ -326,5 +330,67 @@ class ODXCollectionTest {
         val collection = ODXCollection(odx)
         assertThat(collection.ecuSharedDatas).hasSize(1)
         assertThat(collection.ecuSharedDatas["esd1"]).isSameInstanceAs(esd)
+    }
+
+    private fun createOdxWithTableRow(
+        tableId: String = "t1",
+        tableShortName: String = "TestTable",
+        rowId: String = "tr1",
+        rowShortName: String = "Row1",
+        additionalRowwrapperItems: List<Any> = emptyList(),
+    ): Pair<ODXCollection, TABLEROW> {
+        val row = TABLEROW()
+        row.id = rowId
+        row.shortname = rowShortName
+        row.key = "1"
+
+        val table = TABLE()
+        table.id = tableId
+        table.shortname = tableShortName
+        table.rowwrapper.add(row)
+        additionalRowwrapperItems.forEach { table.rowwrapper.add(it) }
+
+        val ddd = DIAGDATADICTIONARYSPEC()
+        ddd.tables = TABLES().apply { this.table.add(table) }
+
+        val bv = BASEVARIANT()
+        bv.id = "bv1"
+        bv.shortname = "BV1"
+        bv.diagdatadictionaryspec = ddd
+
+        val odx =
+            createOdxWithDiagLayerContainer {
+                basevariants = BASEVARIANTS().apply { basevariant.add(bv) }
+            }
+
+        return ODXCollection(odx) to row
+    }
+
+    @Test
+    fun `tableRows filters out ODXLINK row references`() {
+        val odxLink = ODXLINK()
+        odxLink.idref = "tr_external"
+
+        val (collection, row) = createOdxWithTableRow(additionalRowwrapperItems = listOf(odxLink))
+
+        // Only the inline TABLEROW should appear; the ODXLINK row-ref is silently skipped.
+        assertThat(collection.tableRows).hasSize(1)
+        assertThat(collection.tableRows["tr1"]).isSameInstanceAs(row)
+    }
+
+    @Test
+    fun `tableRowsByShortName indexes rows by short name`() {
+        val (collection, row) = createOdxWithTableRow()
+
+        assertThat(collection.tableRowsByShortName["Row1"]).isSameInstanceAs(row)
+        assertThat(collection.tableRowsByShortName["NonExistent"]).isNull()
+    }
+
+    @Test
+    fun `resolveTableRowByShortName finds row by short name`() {
+        val (collection, row) = createOdxWithTableRow()
+
+        assertThat(collection.resolveTableRowByShortName("Row1")).isSameInstanceAs(row)
+        assertThat(collection.resolveTableRowByShortName("NonExistent")).isNull()
     }
 }

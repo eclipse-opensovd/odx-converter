@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Synthetic ODX fixture for the lenient-mode multi-entry TABLE-KEY integration test.
+
+  A TABLE-KEY may legally hold only one entry (TABLE-REF, TABLE-ROW-REF, TABLE-SNREF, or
+  TABLE-ROW-SNREF) according to the MDD file format.  When two entries are present the
+  converter normally throws.  With ConverterOptions(lenient=true) it logs a warning and
+  uses only the first entry, allowing conversion to complete.
+
+  This fixture deliberately contains a TABLE-KEY with two entries so that:
+    - Running the converter with lenient=false → error (not tested here)
+    - Running the converter with lenient=true  → success (tested by LenientTableKeyTest)
+-->
+<ODX MODEL-VERSION="2.2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <DIAG-LAYER-CONTAINER ID="dlc_lenient">
+    <SHORT-NAME>LenientContainer</SHORT-NAME>
+    <BASE-VARIANTS>
+      <BASE-VARIANT ID="bv_lenient">
+        <SHORT-NAME>LenientECU</SHORT-NAME>
+
+        <DIAG-DATA-DICTIONARY-SPEC>
+
+          <DATA-OBJECT-PROPS>
+            <DATA-OBJECT-PROP ID="dop_key_lenient">
+              <SHORT-NAME>DOP_KeyLenient</SHORT-NAME>
+              <COMPU-METHOD>
+                <CATEGORY>IDENTICAL</CATEGORY>
+              </COMPU-METHOD>
+              <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                <BIT-LENGTH>8</BIT-LENGTH>
+              </DIAG-CODED-TYPE>
+              <PHYSICAL-TYPE BASE-DATA-TYPE="A_UINT32"/>
+            </DATA-OBJECT-PROP>
+          </DATA-OBJECT-PROPS>
+
+          <TABLES>
+            <TABLE ID="table_lenient">
+              <SHORT-NAME>LenientTable</SHORT-NAME>
+              <KEY-DOP-REF ID-REF="dop_key_lenient"/>
+              <TABLE-ROW ID="tr_lenient1">
+                <SHORT-NAME>LenientRow1</SHORT-NAME>
+                <KEY>1</KEY>
+              </TABLE-ROW>
+              <TABLE-ROW ID="tr_lenient2">
+                <SHORT-NAME>LenientRow2</SHORT-NAME>
+                <KEY>2</KEY>
+              </TABLE-ROW>
+            </TABLE>
+          </TABLES>
+
+        </DIAG-DATA-DICTIONARY-SPEC>
+
+        <DIAG-COMMS>
+          <DIAG-SERVICE ID="ds_lenient" SEMANTIC="DATA" ADDRESSING="PHYSICAL"
+                        TRANSMISSION-MODE="SEND-AND-RECEIVE">
+            <SHORT-NAME>ReadWithMultiEntryTableKey</SHORT-NAME>
+            <REQUEST-REF ID-REF="req_lenient"/>
+            <POS-RESPONSE-REFS>
+              <POS-RESPONSE-REF ID-REF="pr_lenient"/>
+            </POS-RESPONSE-REFS>
+          </DIAG-SERVICE>
+        </DIAG-COMMS>
+
+        <REQUESTS>
+          <REQUEST ID="req_lenient">
+            <SHORT-NAME>RQ_Lenient</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>210</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <!--
+                TABLE-KEY with two entries: TABLE-REF + TABLE-ROW-REF.
+                The MDD format supports only one entry; in lenient mode the converter
+                logs a warning and uses only the first entry (TABLE-REF).
+              -->
+              <PARAM xsi:type="TABLE-KEY" ID="tk_multi">
+                <SHORT-NAME>MultiEntryKey</SHORT-NAME>
+                <BYTE-POSITION>1</BYTE-POSITION>
+                <TABLE-REF ID-REF="table_lenient"/>
+                <TABLE-ROW-REF ID-REF="tr_lenient1"/>
+              </PARAM>
+              <PARAM xsi:type="TABLE-STRUCT">
+                <SHORT-NAME>StructForMultiKey</SHORT-NAME>
+                <BYTE-POSITION>2</BYTE-POSITION>
+                <TABLE-KEY-SNREF SHORT-NAME="MultiEntryKey"/>
+              </PARAM>
+            </PARAMS>
+          </REQUEST>
+        </REQUESTS>
+
+        <POS-RESPONSES>
+          <POS-RESPONSE ID="pr_lenient">
+            <SHORT-NAME>PR_Lenient</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST" SEMANTIC="SERVICE-ID">
+                <SHORT-NAME>SID</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <CODED-VALUE>211</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+            </PARAMS>
+          </POS-RESPONSE>
+        </POS-RESPONSES>
+
+      </BASE-VARIANT>
+    </BASE-VARIANTS>
+  </DIAG-LAYER-CONTAINER>
+</ODX>

@@ -280,9 +280,11 @@ class ODXCollection(
         diagDataDictionaries
             .flatMap { it.tables?.table ?: emptyList() }
             .flatMap { it.rowwrapper }
-            .map {
-                it as? TABLEROW ?: error("Unexpected type: ${it::class.java.simpleName}")
-            }.associateBy { it.id }
+            // rowwrapper may contain ODXLINK elements (row references) in addition to
+            // inline TABLEROW elements. ODXLINK rows are excluded here because they carry
+            // no ID of their own; they are resolved on demand via ODXCollectionGroup.resolveTableRow().
+            .filterIsInstance<TABLEROW>()
+            .associateBy { it.id }
     }
 
     val endofpdufields: Map<String, ENDOFPDUFIELD> by lazy {
@@ -461,6 +463,10 @@ class ODXCollection(
         tables.values.associateBy { it.shortname }
     }
 
+    val tableRowsByShortName: Map<String, TABLEROW> by lazy {
+        tableRows.values.associateBy { it.shortname }
+    }
+
     // Short-name resolution methods for SNREF support
 
     fun resolveDopByShortName(shortName: String): DATAOBJECTPROP? = dataObjectPropsByShortName[shortName]
@@ -478,4 +484,6 @@ class ODXCollection(
     fun resolveProtStackByShortName(shortName: String): PROTSTACK? = protStacksByShortName[shortName]
 
     fun resolveTableByShortName(shortName: String): TABLE? = tablesByShortName[shortName]
+
+    fun resolveTableRowByShortName(shortName: String): TABLEROW? = tableRowsByShortName[shortName]
 }

@@ -187,6 +187,7 @@ import schema.odx.RESPONSE
 import schema.odx.SCALECONSTR
 import schema.odx.SIMPLEVALUE
 import schema.odx.SINGLEECUJOB
+import schema.odx.SNREF
 import schema.odx.STANDARDLENGTHTYPE
 import schema.odx.STATE
 import schema.odx.STATECHART
@@ -380,10 +381,15 @@ class DatabaseWriter(
             val rows =
                 this.rowwrapper
                     .map { row ->
-                        if (row is TABLEROW) {
-                            row.offset()
-                        } else {
-                            error("Unsupported row type ${row.javaClass.simpleName}")
+                        when (row) {
+                            is TABLEROW -> row.offset()
+                            is ODXLINK -> {
+                                val resolved =
+                                    odx.resolveTableRow(row)
+                                        ?: error("Couldn't resolve TABLE-ROW-REF ${row.idref}")
+                                resolved.offset()
+                            }
+                            else -> error("Unsupported row type ${row.javaClass.simpleName}")
                         }
                     }.toIntArray()
                     .let {
@@ -706,12 +712,19 @@ class DatabaseWriter(
                         }
 
                         is TABLEKEY -> {
-                            val entry =
-                                this.rest.firstOrNull()?.value
+                            val firstEntry =
+                                this.rest.firstOrNull()
                                     ?: error("TABLE-KEY ${this.id} has no entries")
                             if (this.rest.size > 1) {
-                                error("TABLE-KEY ${this.id} has more than one entry")
+                                if (!options.lenient) {
+                                    error("TABLE-KEY ${this.id} has more than one entry, which is not supported in the file format")
+                                } else {
+                                    logger.warning(
+                                        "TABLE-KEY ${this.id} has more than one entry, which is not supported in the file format. Only the first entry will be used.",
+                                    )
+                                }
                             }
+                            val entry = firstEntry.value
                             var tableKeyReference: Int
                             var tableKeyReferenceType: UByte
                             if (entry is ODXLINK) {
@@ -725,6 +738,29 @@ class DatabaseWriter(
                                 } else {
                                     tableKeyReference = table.offset()
                                     tableKeyReferenceType = TableKeyReference.TableDop
+                                }
+                            } else if (entry is SNREF) {
+                                // SNREFs are local-scope references (ODX spec §7.3.5): they
+                                // resolve within the diag-layer that contains the TABLE-KEY,
+                                // not across files. collectionOf(this) gives the owning
+                                // ODXCollection; no cross-file fallback is attempted, unlike
+                                // the ODXLINK path above which uses docref-aware resolution.
+                                val elementName = firstEntry.name.localPart
+                                val collection = collectionOf(this)
+                                if (elementName == "TABLE-SNREF") {
+                                    val table =
+                                        collection.resolveTableByShortName(entry.shortname)
+                                            ?: error("Couldn't find TABLE by short name: ${entry.shortname}")
+                                    tableKeyReference = table.offset()
+                                    tableKeyReferenceType = TableKeyReference.TableDop
+                                } else if (elementName == "TABLE-ROW-SNREF") {
+                                    val row =
+                                        collection.resolveTableRowByShortName(entry.shortname)
+                                            ?: error("Couldn't find TABLE-ROW by short name: ${entry.shortname}")
+                                    tableKeyReference = row.offset()
+                                    tableKeyReferenceType = TableKeyReference.TableRow
+                                } else {
+                                    error("Unexpected SNREF element name '$elementName' for TABLE-KEY ${this.id}")
                                 }
                             } else {
                                 error("Unknown type for TABLE-KEY/TABLEROW ${this.id} entry ${entry.javaClass.simpleName}")
@@ -1985,7 +2021,8 @@ class DatabaseWriter(
         }
 
     fun PARENTREF.offset(): Int {
-        val resolved = odx.resolveParent(this)
+        val resolved =
+            odx.resolveParent(this) ?: throw IllegalStateException("Couldn't resolve parent for idref ${this.idref}")
         val resolvedOffs =
             when (resolved) {
                 is BASEVARIANT -> resolved.offset()

@@ -25,6 +25,7 @@ import org.eclipse.opensovd.cda.mdd.MDDFile
 import schema.odx.ODX
 import java.io.File
 import java.util.logging.Logger
+import kotlin.io.path.createTempDirectory
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 
@@ -39,7 +40,7 @@ class IntegrationTest {
 
     @BeforeTest
     fun setUp() {
-        tempDir = createTempDir("integration-test")
+        tempDir = createTempDirectory("integration-test").toFile()
         tempDir.deleteOnExit()
 
         val pdxFile = File(tempDir, "synthetic.pdx")
@@ -600,7 +601,7 @@ class AudienceFilteringTest {
 
     @BeforeTest
     fun setUp() {
-        val tempDir = createTempDir("audience-filter-test")
+        val tempDir = createTempDirectory("audience-filter-test").toFile()
         tempDir.deleteOnExit()
 
         val pdxFile = File(tempDir, "synthetic.pdx")
