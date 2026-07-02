@@ -20,6 +20,7 @@ import org.apache.commons.compress.compressors.lzma.LZMACompressorOutputStream
 import org.eclipse.opensovd.cda.mdd.Signature
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
+import kotlin.time.measureTime
 
 /**
  * Default compression plugin, compresses chunks with LZMA, and adds a sha512 hash of the initial (uncompressed) data.
@@ -46,24 +47,33 @@ class CompressionPlugin : ConverterPlugin {
 
         // Compress chunk
         api.logger.finest("Compressing chunk with LZMA")
-        val compressed = ByteArrayOutputStream()
-        LZMACompressorOutputStream(compressed).use { outputStream ->
-            outputStream.write(data)
-        }
+        val compressed: ByteArrayOutputStream
+        val compressionDuration =
+            measureTime {
+                compressed = ByteArrayOutputStream()
+                LZMACompressorOutputStream(compressed).use { outputStream ->
+                    outputStream.write(data)
+                }
+            }
+        api.logger.fine("LZMA compression took $compressionDuration (${data.size} -> ${compressed.size()} bytes)")
 
         chunkApi.chunk.setData(ByteString.copyFrom(compressed.toByteArray()))
         chunkApi.chunk.compressionAlgorithm = "lzma"
 
         // Add hash of uncompressed data as signature
         api.logger.finest("Calculating SHA-512 for chunk")
-        val md = MessageDigest.getInstance("SHA-512")
-        val uncompressedDigest = md.digest(data)
-        val signature =
-            Signature
-                .newBuilder()
-                .setAlgorithm("sha512_uncompressed")
-                .setSignature(ByteString.copyFrom(uncompressedDigest))
-        chunkApi.chunk.addSignatures(signature)
+        val hashingDuration =
+            measureTime {
+                val md = MessageDigest.getInstance("SHA-512")
+                val uncompressedDigest = md.digest(data)
+                val signature =
+                    Signature
+                        .newBuilder()
+                        .setAlgorithm("sha512_uncompressed")
+                        .setSignature(ByteString.copyFrom(uncompressedDigest))
+                chunkApi.chunk.addSignatures(signature)
+            }
+        api.logger.fine("SHA-512 hashing took $hashingDuration")
     }
 
     override fun afterProcessing(api: ConverterApi) {
