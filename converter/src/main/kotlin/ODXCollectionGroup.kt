@@ -221,9 +221,12 @@ class ODXCollectionGroup(
 
     private fun sourceCollectionFor(link: Any): ODXCollection? = collectionFor(link)
 
+    /** The source file a tracked reference object was parsed from, if known. */
+    fun sourceFileFor(owner: Any): String? = linkOwnership[owner]
+
     /**
      * Scoped resolution helper. Uses the explicit docref if present, otherwise
-     * determines the source collection via [linkOwnership]. No global fallback.
+     * determines the source collection via [linkOwnership]. Returns null on miss.
      */
     private fun <T> resolveScoped(
         link: Any,
@@ -232,14 +235,8 @@ class ODXCollectionGroup(
         perFileAccessor: (ODXCollection) -> Map<String, T>,
     ): T? {
         val effectiveDocref = docref ?: sourceCollectionFor(link)?.containerKey
-        if (effectiveDocref != null) {
-            val collection = collectionForDocref(effectiveDocref)
-            if (collection != null) {
-                return perFileAccessor(collection)[idref]
-            }
-        }
-        logger.warning("Could not resolve $idref: no docref and no source collection found")
-        return null
+        val collection = effectiveDocref?.let { collectionForDocref(it) }
+        return collection?.let { perFileAccessor(it)[idref] }
     }
 
     fun resolveRequest(link: ODXLINK): REQUEST? = resolveScoped(link, link.idref, link.docref) { it.requests }
@@ -290,6 +287,13 @@ class ODXCollectionGroup(
 
     fun resolveComplexComparam(ref: COMPARAMREF): COMPLEXCOMPARAM? = resolveScoped(ref, ref.idref, ref.docref) { it.complexComparams }
 
+    /** Candidate COMPARAM / COMPLEX-COMPARAM ids visible to a COMPARAM-REF, for diagnostics. */
+    fun comparamCandidates(ref: COMPARAMREF): Collection<String> {
+        val effectiveDocref = ref.docref ?: sourceCollectionFor(ref)?.containerKey
+        val collection = effectiveDocref?.let { collectionForDocref(it) } ?: return emptyList()
+        return collection.comparams.keys + collection.complexComparams.keys
+    }
+
     fun resolveSdgCaption(link: ODXLINK): SDGCAPTION? = resolveScoped(link, link.idref, link.docref) { it.sdgCaptions }
 
     fun resolveStructure(link: ODXLINK): STRUCTURE? = resolveScoped(link, link.idref, link.docref) { it.structures }
@@ -297,28 +301,16 @@ class ODXCollectionGroup(
     /**
      * Resolves a PARENTREF by trying basevariants, ecuvariants, protocols,
      * functionalGroups, tables, and ecuSharedDatas — scoped by docref when available.
+     * Returns null if the parent cannot be found.
      */
     fun resolveParent(ref: PARENTREF): Any? {
         val effectiveDocref = ref.docref ?: sourceCollectionFor(ref)?.containerKey
-        if (effectiveDocref == null) {
-            logger.warning("Could not resolve parent ${ref.idref}: no docref and no source collection found")
-            return null
-        }
-        val collection = collectionForDocref(effectiveDocref)
-        if (collection == null) {
-            logger.warning(
-                "Could not resolve parent for ${ref.idref}: no collection found for docref '$effectiveDocref'. " +
-                    "Known container keys: [${collections.keys.joinToString(", ")}]. " +
-                    "Known layer short-names: [${layerNameToCollection.keys.joinToString(", ")}].",
-            )
-            return null
-        }
-        collection.basevariants[ref.idref]?.let { return it }
-        collection.ecuvariants[ref.idref]?.let { return it }
-        collection.protocols[ref.idref]?.let { return it }
-        collection.functionalGroups[ref.idref]?.let { return it }
-        collection.tables[ref.idref]?.let { return it }
-        collection.ecuSharedDatas[ref.idref]?.let { return it }
-        return null
+        val collection = effectiveDocref?.let { collectionForDocref(it) } ?: return null
+        return collection.basevariants[ref.idref]
+            ?: collection.ecuvariants[ref.idref]
+            ?: collection.protocols[ref.idref]
+            ?: collection.functionalGroups[ref.idref]
+            ?: collection.tables[ref.idref]
+            ?: collection.ecuSharedDatas[ref.idref]
     }
 }

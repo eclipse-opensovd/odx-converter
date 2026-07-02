@@ -59,7 +59,9 @@ class ODXLinkCollector : Unmarshaller.Listener() {
             is MATCHINGPARAMETER,
             is DIAGCOMM,
             is ECUVARIANT,
-            -> linkToFile[target] = currentFile
+            -> {
+                linkToFile[target] = currentFile
+            }
         }
     }
 }

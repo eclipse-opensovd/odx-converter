@@ -222,10 +222,143 @@ class DatabaseWriter(
 
     private val cachedObjects: MutableMap<Any, Int> = mutableMapOf()
 
+    /**
+     * Mutable element path tracking the current position in the ODX object hierarchy.
+     * Pushed/popped via [withPathElement] at key processing boundaries. Used by error
+     * reporting helpers to produce human-readable breadcrumb paths.
+     */
+    private val elementPath = mutableListOf<Any>()
+
+    /** Executes [block] with [element] appended to [elementPath], removing it afterwards. */
+    private inline fun <T> withPathElement(
+        element: Any,
+        block: () -> T,
+    ): T {
+        elementPath.add(element)
+        try {
+            return block()
+        } finally {
+            elementPath.removeLast()
+        }
+    }
+
+    /**
+     * Combines [cachedObjects] caching with [withPathElement] tracking.
+     * The receiver is used as both the cache key and the path element.
+     * The [block] runs with the receiver as `this`, so callers retain
+     * natural access to the ODX object's properties.
+     */
+    private fun <T : Any> T.cachedWithPath(block: T.() -> Int): Int =
+        cachedObjects.getOrPut(this) {
+            withPathElement(this) {
+                this@cachedWithPath.block()
+            }
+        }
+
     /** Returns the [ODXCollection] that [owner] was parsed from, for SNREF resolution. */
     private fun collectionOf(owner: Any): ODXCollection =
         odx.collectionFor(owner)
             ?: error("No source collection found for $owner")
+
+    /**
+     * Reports a short-name (SNREF) resolution failure with full context. Mirrors the
+     * verbose ODXLINK reporting in [ODXCollectionGroup.resolveScoped]. Always throws.
+     */
+    private fun snrefFailure(
+        expected: String,
+        shortName: String,
+        owner: Any,
+        candidates: Collection<String>,
+    ): Nothing =
+        throw OdxResolutionException(
+            resolutionMessage(
+                ResolutionContext(
+                    expected = expected,
+                    refKind = "SNREF",
+                    refValue = shortName,
+                    sourceFile = odx.sourceFileFor(owner),
+                    logicalPath = elementPath.takeIf { it.isNotEmpty() }?.let { formatElementPath(it) },
+                    scopeSearched = odx.collectionFor(owner)?.containerKey,
+                    candidates = candidates,
+                ),
+            ),
+        )
+
+    /**
+     * Reports a SNREF resolution failure for a POS-RESPONSE output parameter. Used in
+     * [offsetMatchingParameterBase] and [offsetMatchingParameter] to avoid duplicating
+     * the same 12-line throw block in both functions.
+     */
+    private fun posResponseParamFailure(
+        expectedShortName: String,
+        owner: Any,
+        diagService: DIAGSERVICE,
+        allParams: List<schema.odx.PARAM>,
+    ): Nothing =
+        throw OdxResolutionException(
+            resolutionMessage(
+                ResolutionContext(
+                    expected = "PARAM (in pos-response)",
+                    refKind = "SNREF",
+                    refValue = expectedShortName,
+                    sourceFile = odx.sourceFileFor(owner) ?: odx.sourceFileFor(diagService),
+                    logicalPath = formatElementPath(elementPath + diagService),
+                    scopeSearched = odx.collectionFor(owner)?.containerKey,
+                    candidates = allParams.map { it.shortname },
+                ),
+            ),
+        )
+
+    /**
+     * Reports an ODXLINK resolution failure with full context. Used at call sites where
+     * the resolve method returns null (e.g. in lenient mode) but the caller cannot
+     * proceed without a result.
+     */
+    private fun odxlinkFailure(
+        expected: String,
+        link: ODXLINK,
+        candidates: Collection<String> = emptyList(),
+    ): Nothing =
+        throw OdxResolutionException(
+            resolutionMessage(
+                ResolutionContext(
+                    expected = expected,
+                    refKind = "ODXLINK",
+                    refValue = link.idref,
+                    docref = link.docref,
+                    sourceFile = odx.sourceFileFor(link),
+                    logicalPath = elementPath.takeIf { it.isNotEmpty() }?.let { formatElementPath(it) },
+                    scopeSearched = link.docref ?: odx.collectionFor(link)?.containerKey,
+                    candidates = candidates,
+                ),
+            ),
+        )
+
+    /**
+     * Reports an ODXLINK resolution failure for reference types other than [ODXLINK]
+     * (e.g. [PRECONDITIONSTATEREF], [STATETRANSITIONREF]) that carry their own idref/docref.
+     */
+    private fun odxlinkFailure(
+        expected: String,
+        owner: Any,
+        idref: String,
+        docref: String? = null,
+    ): Nothing =
+        throw OdxResolutionException(
+            resolutionMessage(
+                ResolutionContext(
+                    expected = expected,
+                    refKind = "ODXLINK",
+                    refValue = idref,
+                    docref = docref,
+                    sourceFile = odx.sourceFileFor(owner),
+                    logicalPath =
+                        elementPath.takeIf { it.isNotEmpty() }?.let { formatElementPath(it) },
+                    scopeSearched = docref ?: odx.collectionFor(owner)?.containerKey,
+                    candidates = emptyList(),
+                ),
+            ),
+        )
 
     private val dtcs: Map<schema.odx.DTC, Int>
     private val baseVariantMap: Map<BASEVARIANT, Int>
@@ -233,16 +366,16 @@ class DatabaseWriter(
     private val functionalGroupMap: Map<FUNCTIONALGROUP, Int>
 
     init {
-        dtcs = odx.dtcs.associateWith { it.offset() }
-        baseVariantMap = odx.basevariants.associateWith { it.offset() }
-        ecuVariantMap = odx.ecuvariants.associateWith { it.offset() }
-        functionalGroupMap = odx.functionalGroups.associateWith { it.offset() }
+        dtcs = odx.dtcs.associateWith { it.offsetDTC() }
+        baseVariantMap = odx.basevariants.associateWith { it.offsetVariantBase() }
+        ecuVariantMap = odx.ecuvariants.associateWith { it.offsetVariantEcu() }
+        functionalGroupMap = odx.functionalGroups.associateWith { it.offsetFunctionalGroup() }
     }
 
     fun createEcuData(): ByteArray {
-        val version = "2025-05-10".offset()
-        val ecuName = odx.ecuName.offset()
-        val odxRevision = odx.odxRevision?.offset()
+        val version = "2025-05-10".offsetString()
+        val ecuName = odx.ecuName.offsetString()
+        val odxRevision = odx.odxRevision?.offsetString()
 
         val dtcs = EcuData.createDtcsVector(builder, dtcs.values.toIntArray())
         val variants =
@@ -267,10 +400,10 @@ class DatabaseWriter(
         return builder.sizedByteArray()
     }
 
-    private fun DOPBASE.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-            val sdgs = this.sdgs?.offset()
+    private fun DOPBASE.offsetDOP(): Int =
+        this.cachedWithPath {
+            val shortName = this.shortname.offsetString()
+            val sdgs = this.sdgs?.offsetSDGS()
 
             val specificData =
                 when (this) {
@@ -310,20 +443,20 @@ class DatabaseWriter(
             DOP.endDOP(builder)
         }
 
-    private fun DIAGSERVICE.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun DIAGSERVICE.offsetDiagService(): Int =
+        this.cachedWithPath {
             val diagComm = (this as DIAGCOMM).offsetInternal()
             val request =
-                odx.resolveRequest(this.requestref)?.offset()
-                    ?: error("Couldn't find requestref ${this.requestref.idref}")
+                odx.resolveRequest(this.requestref)?.offsetRequest()
+                    ?: odxlinkFailure("REQUEST", this.requestref)
             val posResponses =
                 this.posresponserefs
                     ?.posresponseref
                     ?.map {
                         val pr =
                             odx.resolvePosResponse(it)
-                                ?: error("Couldn't find response ${it.idref}")
-                        pr.offset()
+                                ?: odxlinkFailure("POS-RESPONSE", it)
+                        pr.offsetResponse()
                     }?.toIntArray()
                     ?.let {
                         DiagService.createPosResponsesVector(builder, it)
@@ -334,8 +467,8 @@ class DatabaseWriter(
                     ?.map {
                         val nr =
                             odx.resolveNegResponse(it)
-                                ?: error("Couldn't find response ${it.idref}")
-                        nr.offset()
+                                ?: odxlinkFailure("NEG-RESPONSE", it)
+                        nr.offsetResponse()
                     }?.toIntArray()
                     ?.let {
                         DiagService.createNegResponsesVector(builder, it)
@@ -344,7 +477,7 @@ class DatabaseWriter(
                 this.comparamrefs
                     ?.comparamref
                     ?.map {
-                        it.offset()
+                        it.offsetComParamRef()
                     }?.toIntArray()
                     ?.let {
                         DiagService.createComParamRefsVector(builder, it)
@@ -363,31 +496,31 @@ class DatabaseWriter(
             DiagService.endDiagService(builder)
         }
 
-    private fun TABLE.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-            val semantic = this.semantic?.offset()
-            val longName = this.longname?.offset()
-            val keyLabel = this.keylabel?.offset()
+    private fun TABLE.offsetTableDop(): Int =
+        this.cachedWithPath {
+            val shortName = this.shortname.offsetString()
+            val semantic = this.semantic?.offsetString()
+            val longName = this.longname?.offsetLongName()
+            val keyLabel = this.keylabel?.offsetString()
             val keyDop =
                 this.keydopref?.let {
                     val dop =
-                        odx.resolveCombinedDop(it) ?: error("Couldn't find dop ${it.idref}")
-                    dop.offset()
+                        odx.resolveCombinedDop(it) ?: odxlinkFailure("DOP", it)
+                    dop.offsetDOP()
                 }
-            val structLabel = this.structlabel?.offset()
-            val sdgs = this.sdgs?.offset()
+            val structLabel = this.structlabel?.offsetString()
+            val sdgs = this.sdgs?.offsetSDGS()
 
             val rows =
                 this.rowwrapper
                     .map { row ->
                         when (row) {
-                            is TABLEROW -> row.offset()
+                            is TABLEROW -> row.offsetTableRow()
                             is ODXLINK -> {
                                 val resolved =
                                     odx.resolveTableRow(row)
                                         ?: error("Couldn't resolve TABLE-ROW-REF ${row.idref}")
-                                resolved.offset()
+                                resolved.offsetTableRow()
                             }
                             else -> error("Unsupported row type ${row.javaClass.simpleName}")
                         }
@@ -400,7 +533,7 @@ class DatabaseWriter(
                 this.tablediagcommconnectors
                     ?.tablediagcommconnector
                     ?.map {
-                        it.offset()
+                        it.offsetTableDiagCommConnector()
                     }?.toIntArray()
                     ?.let {
                         TableDop.createDiagCommConnectorVector(builder, it)
@@ -421,22 +554,22 @@ class DatabaseWriter(
             TableDop.endTableDop(builder)
         }
 
-    private fun TABLEDIAGCOMMCONNECTOR.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val semantic = this.semantic?.offset()
+    private fun TABLEDIAGCOMMCONNECTOR.offsetTableDiagCommConnector(): Int =
+        cachedWithPath {
+            val semantic = this.semantic?.offsetString()
 
             val diagComm =
                 if (this.diagcommref != null) {
                     val diagService = this.diagcommref?.let { odx.resolveDiagService(it) }
                     val ecuJob = this.diagcommref?.let { odx.resolveSingleEcuJob(it) }
                     if (diagService == null && ecuJob == null) {
-                        error("Couldn't resolve ${this.diagcommref.idref}")
+                        odxlinkFailure("DIAG-SERVICE / SINGLE-ECU-JOB", this.diagcommref)
                     } else if (diagService != null) {
-                        diagService.offset() to DiagServiceOrJob.DiagService
+                        diagService.offsetDiagService() to DiagServiceOrJob.DiagService
                     } else if (ecuJob != null) {
-                        ecuJob.offset() to DiagServiceOrJob.SingleEcuJob
+                        ecuJob.offsetSingleEcuJob() to DiagServiceOrJob.SingleEcuJob
                     } else {
-                        error("Invalid state, no diagService or SingleEcuJOb")
+                        error("Invalid state, no diagService or SingleEcuJob")
                     }
                 } else if (this.diagcommsnref != null) {
                     val shortName = this.diagcommsnref.shortname
@@ -444,11 +577,16 @@ class DatabaseWriter(
                     val diagService = coll.resolveDiagServiceByShortName(shortName)
                     val ecuJob = coll.resolveSingleEcuJobByShortName(shortName)
                     if (diagService != null) {
-                        diagService.offset() to DiagServiceOrJob.DiagService
+                        diagService.offsetDiagService() to DiagServiceOrJob.DiagService
                     } else if (ecuJob != null) {
-                        ecuJob.offset() to DiagServiceOrJob.SingleEcuJob
+                        ecuJob.offsetSingleEcuJob() to DiagServiceOrJob.SingleEcuJob
                     } else {
-                        error("Couldn't resolve diag comm by short name: $shortName")
+                        snrefFailure(
+                            "DIAG-SERVICE/SINGLE-ECU-JOB",
+                            shortName,
+                            this,
+                            coll.diagServicesByShortName.keys + coll.singleEcuJobsByShortName.keys,
+                        )
                     }
                 } else {
                     error("Empty Diag Comm Connector $this")
@@ -461,11 +599,11 @@ class DatabaseWriter(
             TableDiagCommConnector.endTableDiagCommConnector(builder)
         }
 
-    private fun schema.odx.SD.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val value = this.value?.offset()
-            val si = this.si?.offset()
-            val ti = this.ti?.offset()
+    private fun schema.odx.SD.offsetSD(): Int =
+        cachedWithPath {
+            val value = this.value?.offsetString()
+            val si = this.si?.offsetString()
+            val ti = this.ti?.offsetString()
 
             SD.startSD(builder)
 
@@ -476,25 +614,25 @@ class DatabaseWriter(
             SD.endSD(builder)
         }
 
-    private fun schema.odx.SDG.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val si = this.si?.offset()
+    private fun schema.odx.SDG.offsetSDG(): Int =
+        cachedWithPath {
+            val si = this.si?.offsetString()
 
             val caption =
-                this.sdgcaption?.shortname?.offset() ?: this.sdgcaptionref
+                this.sdgcaption?.shortname?.offsetString() ?: this.sdgcaptionref
                     ?.let {
                         val sdgCaption =
-                            odx.resolveSdgCaption(it) ?: error("Couldn't find sdg-caption ${it.idref}")
+                            odx.resolveSdgCaption(it) ?: odxlinkFailure("SDG-CAPTION", it)
                         sdgCaption.shortname
-                    }?.offset()
+                    }?.offsetString()
 
             val sdg =
                 this.sdgOrSD
                     ?.map {
                         val sdOrSdg =
                             when (it) {
-                                is schema.odx.SD -> it.offset()
-                                is schema.odx.SDG -> it.offset()
+                                is schema.odx.SD -> it.offsetSD()
+                                is schema.odx.SDG -> it.offsetSDG()
                                 else -> error("Unknown sdg type: $it")
                             }
                         val sdOrSdgType =
@@ -520,23 +658,23 @@ class DatabaseWriter(
             SDG.endSDG(builder)
         }
 
-    private fun schema.odx.SDGS.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val sdgs = SDGS.createSdgsVector(builder, this.sdg.map { it.offset() }.toIntArray())
+    private fun schema.odx.SDGS.offsetSDGS(): Int =
+        cachedWithPath {
+            val sdgs = SDGS.createSdgsVector(builder, this.sdg.map { it.offsetSDG() }.toIntArray())
 
             SDGS.startSDGS(builder)
             SDGS.addSdgs(builder, sdgs)
             SDGS.endSDGS(builder)
         }
 
-    private fun REQUEST.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val sdgs = this.sdgs?.offset()
+    private fun REQUEST.offsetRequest(): Int =
+        cachedWithPath {
+            val sdgs = this.sdgs?.offsetSDGS()
             val params =
                 this.params
                     ?.param
                     ?.map {
-                        it.offset()
+                        it.offsetParam()
                     }?.toIntArray()
                     ?.let {
                         Request.createParamsVector(builder, it)
@@ -548,14 +686,14 @@ class DatabaseWriter(
             Request.endRequest(builder)
         }
 
-    private fun RESPONSE.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val sdgs = this.sdgs?.offset()
+    private fun RESPONSE.offsetResponse(): Int =
+        cachedWithPath {
+            val sdgs = this.sdgs?.offsetSDGS()
             val params =
                 this.params
                     ?.param
                     ?.map {
-                        it.offset()
+                        it.offsetParam()
                     }?.toIntArray()
                     ?.let {
                         Response.createParamsVector(builder, it)
@@ -577,12 +715,12 @@ class DatabaseWriter(
             Response.endResponse(builder)
         }
 
-    private fun PARAM.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun PARAM.offsetParam(): Int =
+        this.cachedWithPath {
             try {
-                val shortName = this.shortname.offset()
-                val semantic = this.semantic?.offset()
-                val sdgs = this.sdgs?.offset()
+                val shortName = this.shortname.offsetString()
+                val semantic = this.semantic?.offsetString()
+                val sdgs = this.sdgs?.offsetSDGS()
 
                 val specificData =
                     when (this) {
@@ -591,15 +729,20 @@ class DatabaseWriter(
                                 this.dopsnref?.shortname?.let {
                                     val dop =
                                         collectionOf(this).resolveDopByShortName(it)
-                                            ?: error("Couldn't find DOP by short name: $it")
-                                    dop.offset()
+                                            ?: snrefFailure(
+                                                "DATA-OBJECT-PROP",
+                                                it,
+                                                this,
+                                                collectionOf(this).dataObjectPropsByShortName.keys,
+                                            )
+                                    dop.offsetDOP()
                                 } ?: this.dopref?.let {
                                     val dop =
                                         odx.resolveCombinedDop(it)
-                                            ?: error("Couldn't find ${it.idref}")
-                                    dop.offset()
+                                            ?: odxlinkFailure("DOP", it)
+                                    dop.offsetDOP()
                                 }
-                            val physicalDefaultValue = this.physicaldefaultvalue?.offset()
+                            val physicalDefaultValue = this.physicaldefaultvalue?.offsetString()
 
                             Value.startValue(builder)
                             dop?.let { Value.addDop(builder, it) }
@@ -608,8 +751,8 @@ class DatabaseWriter(
                         }
 
                         is CODEDCONST -> {
-                            val diagCodedType = this.diagcodedtype.offset()
-                            val codedValue = this.codedvalue?.offset()
+                            val diagCodedType = this.diagcodedtype.offsetDiagCodedType()
+                            val codedValue = this.codedvalue?.offsetString()
 
                             CodedConst.startCodedConst(builder)
                             CodedConst.addDiagCodedType(builder, diagCodedType)
@@ -627,13 +770,18 @@ class DatabaseWriter(
                                 this.dopsnref?.shortname?.let {
                                     val dop =
                                         collectionOf(this).resolveDopByShortName(it)
-                                            ?: error("Couldn't find DOP by short name: $it")
-                                    dop.offset()
+                                            ?: snrefFailure(
+                                                "DATA-OBJECT-PROP",
+                                                it,
+                                                this,
+                                                collectionOf(this).dataObjectPropsByShortName.keys,
+                                            )
+                                    dop.offsetDOP()
                                 } ?: this.dopref?.let {
                                     val dop =
                                         odx.resolveCombinedDop(it)
-                                            ?: error("Couldn't find ${it.idref}")
-                                    dop.offset()
+                                            ?: odxlinkFailure("DOP", it)
+                                    dop.offsetDOP()
                                 }
 
                             LengthKeyRef.startLengthKeyRef(builder)
@@ -649,9 +797,9 @@ class DatabaseWriter(
                         }
 
                         is NRCCONST -> {
-                            val diagCodedType = this.diagcodedtype?.offset()
+                            val diagCodedType = this.diagcodedtype?.offsetDiagCodedType()
                             val codedValues =
-                                this.codedvalues?.codedvalue?.map { it.offset() }?.toIntArray()?.let {
+                                this.codedvalues?.codedvalue?.map { it.offsetString() }?.toIntArray()?.let {
                                     NrcConst.createCodedValuesVector(builder, it)
                                 }
 
@@ -662,18 +810,23 @@ class DatabaseWriter(
                         }
 
                         is PHYSCONST -> {
-                            val physConstValue = this.physconstantvalue?.offset()
+                            val physConstValue = this.physconstantvalue?.offsetString()
                             val dop =
                                 this.dopsnref?.shortname?.let {
                                     val dop =
                                         collectionOf(this).resolveDopByShortName(it)
-                                            ?: error("Couldn't find DOP by short name: $it")
-                                    dop.offset()
+                                            ?: snrefFailure(
+                                                "DATA-OBJECT-PROP",
+                                                it,
+                                                this,
+                                                collectionOf(this).dataObjectPropsByShortName.keys,
+                                            )
+                                    dop.offsetDOP()
                                 } ?: this.dopref?.let {
                                     val dop =
                                         odx.resolveCombinedDop(it)
-                                            ?: error("Couldn't find ${it.idref}")
-                                    dop.offset()
+                                            ?: odxlinkFailure("DOP", it)
+                                    dop.offsetDOP()
                                 }
 
                             PhysConst.startPhysConst(builder)
@@ -689,18 +842,23 @@ class DatabaseWriter(
                         }
 
                         is SYSTEM -> {
-                            val sysParam = this.sysparam.offset()
+                            val sysParam = this.sysparam.offsetString()
                             val dop =
                                 this.dopsnref?.shortname?.let {
                                     val dop =
                                         collectionOf(this).resolveDopByShortName(it)
-                                            ?: error("Couldn't find DOP by short name: $it")
-                                    dop.offset()
+                                            ?: snrefFailure(
+                                                "DATA-OBJECT-PROP",
+                                                it,
+                                                this,
+                                                collectionOf(this).dataObjectPropsByShortName.keys,
+                                            )
+                                    dop.offsetDOP()
                                 } ?: this.dopref?.let {
                                     val dop =
                                         odx.resolveCombinedDop(it)
-                                            ?: error("Couldn't find DOP ${it.idref}")
-                                    dop.offset()
+                                            ?: odxlinkFailure("DOP", it)
+                                    dop.offsetDOP()
                                 }
 
                             dataformat.System.startSystem(builder)
@@ -732,11 +890,11 @@ class DatabaseWriter(
                                 if (table == null) {
                                     val row =
                                         odx.resolveTableRow(entry)
-                                            ?: error("ODXLINK ${this.id} is neither TABLE nor TABLE-KEY")
-                                    tableKeyReference = row.offset()
+                                            ?: odxlinkFailure("TABLE / TABLE-ROW", entry)
+                                    tableKeyReference = row.offsetTableRow()
                                     tableKeyReferenceType = TableKeyReference.TableRow
                                 } else {
-                                    tableKeyReference = table.offset()
+                                    tableKeyReference = table.offsetTableDop()
                                     tableKeyReferenceType = TableKeyReference.TableDop
                                 }
                             } else if (entry is SNREF) {
@@ -751,13 +909,13 @@ class DatabaseWriter(
                                     val table =
                                         collection.resolveTableByShortName(entry.shortname)
                                             ?: error("Couldn't find TABLE by short name: ${entry.shortname}")
-                                    tableKeyReference = table.offset()
+                                    tableKeyReference = table.offsetTableDop()
                                     tableKeyReferenceType = TableKeyReference.TableDop
                                 } else if (elementName == "TABLE-ROW-SNREF") {
                                     val row =
                                         collection.resolveTableRowByShortName(entry.shortname)
                                             ?: error("Couldn't find TABLE-ROW by short name: ${entry.shortname}")
-                                    tableKeyReference = row.offset()
+                                    tableKeyReference = row.offsetTableRow()
                                     tableKeyReferenceType = TableKeyReference.TableRow
                                 } else {
                                     error("Unexpected SNREF element name '$elementName' for TABLE-KEY ${this.id}")
@@ -773,13 +931,13 @@ class DatabaseWriter(
                         }
 
                         is TABLEENTRY -> {
-                            val param = (this as PARAM).offset()
+                            val param = (this as PARAM).offsetParam()
                             val target = this.target?.toFileFormatEnum()
                             val tableRow =
                                 this.tablerowref?.let {
                                     val row =
-                                        odx.resolveTableRow(it) ?: error("Couldn't find TABLE-ROW ${it.idref}")
-                                    row.offset()
+                                        odx.resolveTableRow(it) ?: odxlinkFailure("TABLE-ROW", it)
+                                    row.offsetTableRow()
                                 }
 
                             TableEntry.startTableEntry(builder)
@@ -795,11 +953,16 @@ class DatabaseWriter(
                                     collectionOf(this)
                                         .tableKeys.values
                                         .firstOrNull { it.shortname == shortName }
-                                        ?.offset()
-                                        ?: error("Couldn't find TABLE-KEY by short name: $shortName")
+                                        ?.offsetParam()
+                                        ?: snrefFailure(
+                                            "TABLE-KEY",
+                                            shortName,
+                                            this,
+                                            collectionOf(this).tableKeys.values.map { it.shortname },
+                                        )
                                 } ?: (
-                                    odx.resolveTableKey(this.tablekeyref)?.offset()
-                                        ?: error("Couldn't find TABLE-KEY ${this.tablekeyref.idref}")
+                                    odx.resolveTableKey(this.tablekeyref)?.offsetParam()
+                                        ?: odxlinkFailure("TABLE-KEY", this.tablekeyref)
                                 )
 
                             TableStruct.startTableStruct(builder)
@@ -849,9 +1012,9 @@ class DatabaseWriter(
             }
         }
 
-    private fun FUNCTCLASS.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortname = this.shortname.offset()
+    private fun FUNCTCLASS.offsetFunctClass(): Int =
+        this.cachedWithPath {
+            val shortname = this.shortname.offsetString()
 
             FunctClass.startFunctClass(builder)
             FunctClass.addShortName(builder, shortname)
@@ -859,7 +1022,7 @@ class DatabaseWriter(
         }
 
     private fun STANDARDLENGTHTYPE.toStandardLengthType(): Int {
-        val bitmask = this.bitmask?.offset()
+        val bitmask = this.bitmask?.offsetByteArray()
 
         StandardLengthType.startStandardLengthType(builder)
         bitmask?.let {
@@ -891,8 +1054,8 @@ class DatabaseWriter(
 
     private fun PARAMLENGTHINFOTYPE.toParamLengthInfoType(): Int {
         val lengthKey =
-            odx.resolveLengthKey(this.lengthkeyref)?.offset()
-                ?: error("Unknown length key reference ${this.lengthkeyref.idref}")
+            odx.resolveLengthKey(this.lengthkeyref)?.offsetParam()
+                ?: odxlinkFailure("LENGTH-KEY", this.lengthkeyref)
 
         ParamLengthInfoType.startParamLengthInfoType(builder)
         ParamLengthInfoType.addLengthKey(builder, lengthKey)
@@ -900,16 +1063,16 @@ class DatabaseWriter(
     }
 
     private fun DATAOBJECTPROP.toNormalDop(): Int {
-        val diagCodedType = this.diagcodedtype?.offset()
+        val diagCodedType = this.diagcodedtype?.offsetDiagCodedType()
         val unit =
             this.unitref?.let {
-                val unit = odx.resolveUnit(it) ?: error("Couldn't find unit ${it.idref}")
-                unit.offset()
+                val unit = odx.resolveUnit(it) ?: odxlinkFailure("UNIT", it)
+                unit.offsetUnit()
             }
-        val physicalType = this.physicaltype?.offset()
-        val compuMethod = this.compumethod?.offset()
-        val internalConstr = this.internalconstr?.offset()
-        val physConstr = this.physconstr?.offset()
+        val physicalType = this.physicaltype?.offsetPhysicalType()
+        val compuMethod = this.compumethod?.offsetCompuMethod()
+        val internalConstr = this.internalconstr?.offsetInternalConstr()
+        val physConstr = this.physconstr?.offsetInternalConstr()
 
         NormalDOP.startNormalDOP(builder)
         diagCodedType?.let { NormalDOP.addDiagCodedType(builder, it) }
@@ -922,9 +1085,9 @@ class DatabaseWriter(
         return NormalDOP.endNormalDOP(builder)
     }
 
-    private fun DIAGCODEDTYPE.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val baseTypeEncoding = this.basetypeencoding?.offset()
+    private fun DIAGCODEDTYPE.offsetDiagCodedType(): Int =
+        cachedWithPath {
+            val baseTypeEncoding = this.basetypeencoding?.offsetString()
 
             val specificData =
                 when (this) {
@@ -984,16 +1147,16 @@ class DatabaseWriter(
             DiagCodedType.endDiagCodedType(builder)
         }
 
-    private fun UNIT.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-            val displayName = this.displayname.offset()
+    private fun UNIT.offsetUnit(): Int =
+        this.cachedWithPath {
+            val shortName = this.shortname.offsetString()
+            val displayName = this.displayname.offsetString()
             val physicaldimension =
                 this.physicaldimensionref?.let { ref ->
                     val physDimension =
                         odx.resolvePhysDimension(ref)
-                            ?: error("Couldn't find physical dimension ${ref.idref}")
-                    physDimension.offset()
+                            ?: odxlinkFailure("PHYSICAL-DIMENSION", ref)
+                    physDimension.offsetPhysicalDimension()
                 }
 
             dataformat.Unit.startUnit(builder)
@@ -1042,25 +1205,25 @@ class DatabaseWriter(
             this.basicstructuresnref?.shortname?.let {
                 val dop =
                     collectionOf(this).resolveStructureByShortName(it)
-                        ?: error("Couldn't find basic structure by short name: $it")
-                dop.offset()
+                        ?: snrefFailure("BASIC-STRUCTURE", it, this, collectionOf(this).structuresByShortName.keys)
+                dop.offsetDOP()
             } ?: this.basicstructureref?.let {
                 val dop =
                     odx.resolveCombinedDop(it)
-                        ?: error("Couldn't find dop ${it.idref}")
-                dop.offset()
+                        ?: odxlinkFailure("DOP (BASIC-STRUCTURE)", it)
+                dop.offsetDOP()
             }
         val envDataRef =
             this.envdatadescsnref?.shortname?.let {
                 val dop =
                     collectionOf(this).resolveEnvDataDescByShortName(it)
-                        ?: error("Couldn't find env data desc by short name: $it")
-                dop.offset()
+                        ?: snrefFailure("ENV-DATA-DESC", it, this, collectionOf(this).envDataDescsByShortName.keys)
+                dop.offsetDOP()
             } ?: this.envdatadescref?.let {
                 val dop =
                     odx.resolveCombinedDop(it)
-                        ?: error("Couldn't find dop ${it.idref}")
-                dop.offset()
+                        ?: odxlinkFailure("DOP (ENV-DATA-DESC)", it)
+                dop.offsetDOP()
             }
 
         Field.startField(builder)
@@ -1078,7 +1241,7 @@ class DatabaseWriter(
                 EnvData.createDtcValuesVector(builder, it)
             }
         val params =
-            this.params?.param?.map { it.offset() }?.toIntArray()?.let {
+            this.params?.param?.map { it.offsetParam() }?.toIntArray()?.let {
                 EnvData.createParamsVector(builder, it)
             }
 
@@ -1094,15 +1257,15 @@ class DatabaseWriter(
                 ?.envdataref
                 ?.map {
                     val envData =
-                        odx.resolveEnvData(it) ?: error("Couldn't find env data ${it.idref}")
-                    envData.offset()
+                        odx.resolveEnvData(it) ?: odxlinkFailure("ENV-DATA", it)
+                    envData.offsetDOP()
                 }?.toIntArray()
                 ?.let {
                     EnvDataDesc.createEnvDatasVector(builder, it)
                 }
 
-        val paramShortName = this.paramsnref?.shortname?.offset()
-        val paramShortNamePath = this.paramsnpathref?.shortnamepath?.offset()
+        val paramShortName = this.paramsnref?.shortname?.offsetString()
+        val paramShortNamePath = this.paramsnpathref?.shortnamepath?.offsetString()
 
         EnvDataDesc.startEnvDataDesc(builder)
 
@@ -1114,8 +1277,8 @@ class DatabaseWriter(
         return EnvDataDesc.endEnvDataDesc(builder)
     }
 
-    private fun PHYSICALTYPE.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun PHYSICALTYPE.offsetPhysicalType(): Int =
+        cachedWithPath {
             PhysicalType.startPhysicalType(builder)
 
             PhysicalType.addBaseDataType(builder, this.basedatatype.toFileFormatEnum())
@@ -1125,11 +1288,11 @@ class DatabaseWriter(
             PhysicalType.endPhysicalType(builder)
         }
 
-    private fun SCALECONSTR.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortLabel = this.shortlabel?.offset()
-            val lowerLimit = this.lowerlimit?.offset()
-            val upperLimit = this.upperlimit?.offset()
+    private fun SCALECONSTR.offsetScaleConstr(): Int =
+        cachedWithPath {
+            val shortLabel = this.shortlabel?.offsetText()
+            val lowerLimit = this.lowerlimit?.offsetLimit()
+            val upperLimit = this.upperlimit?.offsetLimit()
 
             ScaleConstr.startScaleConstr(builder)
             shortLabel?.let { ScaleConstr.addShortLabel(builder, it) }
@@ -1139,14 +1302,14 @@ class DatabaseWriter(
             ScaleConstr.endScaleConstr(builder)
         }
 
-    private fun INTERNALCONSTR.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val lowerLimit = this.lowerlimit?.offset()
-            val upperLimit = this.upperlimit?.offset()
+    private fun INTERNALCONSTR.offsetInternalConstr(): Int =
+        cachedWithPath {
+            val lowerLimit = this.lowerlimit?.offsetLimit()
+            val upperLimit = this.upperlimit?.offsetLimit()
             val scaleConstrs =
                 this.scaleconstrs
                     ?.scaleconstr
-                    ?.map { it.offset() }
+                    ?.map { it.offsetScaleConstr() }
                     ?.toIntArray()
                     ?.let {
                         InternalConstr.createScaleConstrVector(builder, it)
@@ -1159,12 +1322,12 @@ class DatabaseWriter(
             InternalConstr.endInternalConstr(builder)
         }
 
-    private fun schema.odx.DTC.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-            val displayTroubleCode = this.displaytroublecode?.offset()
-            val text = this.text?.offset()
-            val sdgs = this.sdgs?.offset()
+    private fun schema.odx.DTC.offsetDTC(): Int =
+        this.cachedWithPath {
+            val shortName = this.shortname.offsetString()
+            val displayTroubleCode = this.displaytroublecode?.offsetString()
+            val text = this.text?.offsetText()
+            val sdgs = this.sdgs?.offsetSDGS()
 
             DTC.startDTC(builder)
 
@@ -1188,10 +1351,10 @@ class DatabaseWriter(
             DTC.endDTC(builder)
         }
 
-    private fun LONGNAME.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val tiOffset = this.ti?.offset()
-            val valueOffset = this.value?.offset()
+    private fun LONGNAME.offsetLongName(): Int =
+        cachedWithPath {
+            val tiOffset = this.ti?.offsetString()
+            val valueOffset = this.value?.offsetString()
 
             LongName.startLongName(builder)
             tiOffset?.let { LongName.addTi(builder, tiOffset) }
@@ -1199,10 +1362,10 @@ class DatabaseWriter(
             LongName.endLongName(builder)
         }
 
-    private fun TEXT.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val ti = this.ti?.offset()
-            val value = this.value?.offset()
+    private fun TEXT.offsetText(): Int =
+        cachedWithPath {
+            val ti = this.ti?.offsetString()
+            val value = this.value?.offsetString()
 
             Text.startText(builder)
 
@@ -1212,10 +1375,10 @@ class DatabaseWriter(
             Text.endText(builder)
         }
 
-    private fun COMPUMETHOD.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val internalToPhys = this.compuinternaltophys?.offset()
-            val physToInternal = this.compuphystointernal?.offset()
+    private fun COMPUMETHOD.offsetCompuMethod(): Int =
+        cachedWithPath {
+            val internalToPhys = this.compuinternaltophys?.offsetCompuInternalToPhys()
+            val physToInternal = this.compuphystointernal?.offsetCompuPhysToInternal()
 
             CompuMethod.startCompuMethod(builder)
 
@@ -1225,14 +1388,14 @@ class DatabaseWriter(
             CompuMethod.endCompuMethod(builder)
         }
 
-    private fun LIBRARY.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-            val longName = this.longname?.offset()
-            val codeFile = this.codefile.offset()
-            val encryption = this.encryption?.offset()
-            val syntax = this.syntax.offset()
-            val entrypoint = this.entrypoint?.offset()
+    private fun LIBRARY.offsetLibrary(): Int =
+        this.cachedWithPath {
+            val shortName = this.shortname.offsetString()
+            val longName = this.longname?.offsetLongName()
+            val codeFile = this.codefile.offsetString()
+            val encryption = this.encryption?.offsetString()
+            val syntax = this.syntax.offsetString()
+            val entrypoint = this.entrypoint?.offsetString()
 
             Library.startLibrary(builder)
             Library.addShortName(builder, shortName)
@@ -1250,21 +1413,21 @@ class DatabaseWriter(
             Library.endLibrary(builder)
         }
 
-    private fun PROGCODE.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val codeFile = this.codefile?.offset()
-            val encryption = this.encryption?.offset()
-            val syntax = this.syntax?.offset()
-            val revision = this.revision?.offset()
-            val entrypoint = this.entrypoint?.offset()
+    private fun PROGCODE.offsetProgCode(): Int =
+        cachedWithPath {
+            val codeFile = this.codefile?.offsetString()
+            val encryption = this.encryption?.offsetString()
+            val syntax = this.syntax?.offsetString()
+            val revision = this.revision?.offsetString()
+            val entrypoint = this.entrypoint?.offsetString()
             val libraries =
                 this.libraryrefs
                     ?.libraryref
                     ?.map { ref ->
                         val library =
                             odx.resolveLibrary(ref)
-                                ?: error("Couldn't find LIBRARY ${ref.idref}")
-                        library.offset()
+                                ?: odxlinkFailure("LIBRARY", ref)
+                        library.offsetLibrary()
                     }?.toIntArray()
                     ?.let {
                         ProgCode.createLibraryVector(builder, it)
@@ -1281,14 +1444,14 @@ class DatabaseWriter(
             ProgCode.endProgCode(builder)
         }
 
-    private fun COMPUPHYSTOINTERNAL.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val progcode = this.progcode?.offset()
+    private fun COMPUPHYSTOINTERNAL.offsetCompuPhysToInternal(): Int =
+        cachedWithPath {
+            val progcode = this.progcode?.offsetProgCode()
             val compuscales =
-                this.compuscales?.compuscale?.map { it.offset() }?.toIntArray()?.let {
+                this.compuscales?.compuscale?.map { it.offsetCompuScale() }?.toIntArray()?.let {
                     CompuPhysToInternal.createCompuScalesVector(builder, it)
                 }
-            val compudefaultvalue = this.compudefaultvalue?.offset()
+            val compudefaultvalue = this.compudefaultvalue?.offsetCompuDefaultValue()
 
             CompuPhysToInternal.startCompuPhysToInternal(builder)
             progcode?.let { CompuPhysToInternal.addProgCode(builder, it) }
@@ -1297,14 +1460,14 @@ class DatabaseWriter(
             CompuPhysToInternal.endCompuPhysToInternal(builder)
         }
 
-    private fun COMPUINTERNALTOPHYS.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val progcode = this.progcode?.offset()
+    private fun COMPUINTERNALTOPHYS.offsetCompuInternalToPhys(): Int =
+        cachedWithPath {
+            val progcode = this.progcode?.offsetProgCode()
             val compuscales =
-                this.compuscales?.compuscale?.map { it.offset() }?.toIntArray()?.let {
+                this.compuscales?.compuscale?.map { it.offsetCompuScale() }?.toIntArray()?.let {
                     CompuInternalToPhys.createCompuScalesVector(builder, it)
                 }
-            val compudefaultvalue = this.compudefaultvalue?.offset()
+            val compudefaultvalue = this.compudefaultvalue?.offsetCompuDefaultValue()
 
             CompuInternalToPhys.startCompuInternalToPhys(builder)
             progcode?.let { CompuInternalToPhys.addProgCode(builder, it) }
@@ -1313,14 +1476,14 @@ class DatabaseWriter(
             CompuInternalToPhys.endCompuInternalToPhys(builder)
         }
 
-    private fun COMPUSCALE.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortLabel = this.shortlabel?.offset()
-            val lowerLimit = this.lowerlimit?.offset()
-            val upperLimit = this.upperlimit?.offset()
-            val compuInverseValue = this.compuinversevalue?.offset()
-            val compuConst = this.compuconst?.offset()
-            val rationalCoEffs = this.compurationalcoeffs?.offset()
+    private fun COMPUSCALE.offsetCompuScale(): Int =
+        cachedWithPath {
+            val shortLabel = this.shortlabel?.offsetText()
+            val lowerLimit = this.lowerlimit?.offsetLimit()
+            val upperLimit = this.upperlimit?.offsetLimit()
+            val compuInverseValue = this.compuinversevalue?.offsetCompuValuesInverseValue()
+            val compuConst = this.compuconst?.offsetCompuValuesConst()
+            val rationalCoEffs = this.compurationalcoeffs?.offsetCompuRationalCoEffs()
 
             CompuScale.startCompuScale(builder)
             shortLabel?.let { CompuScale.addShortLabel(builder, it) }
@@ -1332,9 +1495,9 @@ class DatabaseWriter(
             CompuScale.endCompuScale(builder)
         }
 
-    private fun LIMIT.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val value = this.value?.offset()
+    private fun LIMIT.offsetLimit(): Int =
+        cachedWithPath {
+            val value = this.value?.offsetString()
 
             Limit.startLimit(builder)
             value?.let { Limit.addValue(builder, value) }
@@ -1342,10 +1505,10 @@ class DatabaseWriter(
             Limit.endLimit(builder)
         }
 
-    private fun COMPUINVERSEVALUE.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val vtValue = this.vt?.value?.offset()
-            val vtTi = this.vt?.ti?.offset()
+    private fun COMPUINVERSEVALUE.offsetCompuValuesInverseValue(): Int =
+        cachedWithPath {
+            val vtValue = this.vt?.value?.offsetString()
+            val vtTi = this.vt?.ti?.offsetString()
 
             CompuValues.startCompuValues(builder)
             this.v?.value?.let {
@@ -1360,10 +1523,10 @@ class DatabaseWriter(
             CompuValues.endCompuValues(builder)
         }
 
-    private fun COMPUCONST.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val vtValue = this.vt?.value?.offset()
-            val vtTi = this.vt?.ti?.offset()
+    private fun COMPUCONST.offsetCompuValuesConst(): Int =
+        cachedWithPath {
+            val vtValue = this.vt?.value?.offsetString()
+            val vtTi = this.vt?.ti?.offsetString()
 
             CompuValues.startCompuValues(builder)
             this.v?.value?.let {
@@ -1378,10 +1541,10 @@ class DatabaseWriter(
             CompuValues.endCompuValues(builder)
         }
 
-    private fun COMPUDEFAULTVALUE.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val vtTi = this.vt?.ti?.offset()
-            val vtValue = this.vt?.value?.offset()
+    private fun COMPUDEFAULTVALUE.offsetCompuDefaultValue(): Int =
+        cachedWithPath {
+            val vtTi = this.vt?.ti?.offsetString()
+            val vtValue = this.vt?.value?.offsetString()
             val values =
                 if (vtValue != null || vtTi != null || this.v?.value != null) {
                     CompuValues.startCompuValues(builder)
@@ -1403,12 +1566,12 @@ class DatabaseWriter(
                 this.compuinversevalue
                     ?.vt
                     ?.ti
-                    ?.offset()
+                    ?.offsetString()
             val invVtValue =
                 this.compuinversevalue
                     ?.vt
                     ?.value
-                    ?.offset()
+                    ?.offsetString()
             val inverseValues =
                 if (invVtTi != null || invVtValue != null || this.compuinversevalue?.v?.value != null) {
                     CompuValues.startCompuValues(builder)
@@ -1436,8 +1599,8 @@ class DatabaseWriter(
             CompuDefaultValue.endCompuDefaultValue(builder)
         }
 
-    private fun COMPURATIONALCOEFFS.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun COMPURATIONALCOEFFS.offsetCompuRationalCoEffs(): Int =
+        cachedWithPath {
             val numerator =
                 this.compunumerator?.v?.mapNotNull { it.value }?.let {
                     CompuRationalCoEffs.createNumeratorVector(builder, it.toDoubleArray())
@@ -1453,18 +1616,18 @@ class DatabaseWriter(
         }
 
     private fun schema.odx.DTCDOP.toDTCDOP(): Int {
-        val diagCodedType = this.diagcodedtype.offset()
-        val physicalType = this.physicaltype.offset()
-        val compuMethod = this.compumethod.offset()
+        val diagCodedType = this.diagcodedtype.offsetDiagCodedType()
+        val physicalType = this.physicaltype.offsetPhysicalType()
+        val compuMethod = this.compumethod.offsetCompuMethod()
 
         val dtcs =
             this.dtcs.dtcproxy
                 ?.map {
                     if (it is schema.odx.DTC) {
-                        it.offset()
+                        it.offsetDTC()
                     } else if (it is ODXLINK) {
-                        val dop = odx.resolveDtc(it) ?: error("Couldn't find DTC ${it.idref}")
-                        dop.offset()
+                        val dop = odx.resolveDtc(it) ?: odxlinkFailure("DTC", it)
+                        dop.offsetDTC()
                     } else {
                         error("Unsupported DTC type ${it::class.java.simpleName}")
                     }
@@ -1483,12 +1646,12 @@ class DatabaseWriter(
     }
 
     private fun schema.odx.MUX.toMUXDOP(): Int {
-        val switchKey = this.switchkey.offset()
-        val defaultCase = this.defaultcase?.offset()
+        val switchKey = this.switchkey.offsetSwitchKey()
+        val defaultCase = this.defaultcase?.offsetDefaultCase()
         val cases =
             this.cases
                 ?.case
-                ?.map { it.offset() }
+                ?.map { it.offsetCase() }
                 ?.toIntArray()
                 ?.let { MUXDOP.createCasesVector(builder, it) }
 
@@ -1503,7 +1666,7 @@ class DatabaseWriter(
 
     private fun DYNAMICLENGTHFIELD.toDynamicLengthField(): Int {
         val field = (this as FIELD).toField()
-        val determineNumberOfItems = this.determinenumberofitems.offset()
+        val determineNumberOfItems = this.determinenumberofitems.offsetDetermineNumberOfItems()
 
         DynamicLengthField.startDynamicLengthField(builder)
 
@@ -1519,7 +1682,7 @@ class DatabaseWriter(
             this.params
                 ?.param
                 ?.map {
-                    it.offset()
+                    it.offsetParam()
                 }?.toIntArray()
                 ?.let {
                     Structure.createParamsVector(builder, it)
@@ -1533,14 +1696,14 @@ class DatabaseWriter(
         return Structure.endStructure(builder)
     }
 
-    private fun DETERMINENUMBEROFITEMS.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun DETERMINENUMBEROFITEMS.offsetDetermineNumberOfItems(): Int =
+        cachedWithPath {
             val dop =
                 this.dataobjectpropref?.let {
                     val dop =
                         odx.resolveCombinedDop(it)
-                            ?: error("Couldn't find ${it.idref}")
-                    dop.offset()
+                            ?: odxlinkFailure("DOP", it)
+                    dop.offsetDOP()
                 }
 
             DetermineNumberOfItems.startDetermineNumberOfItems(builder)
@@ -1550,10 +1713,10 @@ class DatabaseWriter(
             DetermineNumberOfItems.endDetermineNumberOfItems(builder)
         }
 
-    private fun ADDITIONALAUDIENCE.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-            val longName = this.longname?.offset()
+    private fun ADDITIONALAUDIENCE.offsetAdditionalAudience(): Int =
+        this.cachedWithPath {
+            val shortName = this.shortname.offsetString()
+            val longName = this.longname?.offsetLongName()
 
             AdditionalAudience.startAdditionalAudience(builder)
 
@@ -1565,8 +1728,8 @@ class DatabaseWriter(
             AdditionalAudience.endAdditionalAudience(builder)
         }
 
-    private fun AUDIENCE.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun AUDIENCE.offsetAudience(): Int =
+        cachedWithPath {
             val enabledAudiences =
                 this.enabledaudiencerefs?.enabledaudienceref?.let { aa ->
                     Audience.createEnabledAudiencesVector(
@@ -1575,8 +1738,8 @@ class DatabaseWriter(
                             .map {
                                 val aud =
                                     odx.resolveAdditionalAudience(it)
-                                        ?: error("Can't find additional audience ${it.idref}")
-                                aud.offset()
+                                        ?: odxlinkFailure("ADDITIONAL-AUDIENCE", it)
+                                aud.offsetAdditionalAudience()
                             }.toIntArray(),
                     )
                 }
@@ -1589,8 +1752,8 @@ class DatabaseWriter(
                             .map {
                                 val aud =
                                     odx.resolveAdditionalAudience(it)
-                                        ?: error("Can't find additional audience ${it.idref}")
-                                aud.offset()
+                                        ?: odxlinkFailure("ADDITIONAL-AUDIENCE", it)
+                                aud.offsetAdditionalAudience()
                             }.toIntArray(),
                     )
                 }
@@ -1616,13 +1779,13 @@ class DatabaseWriter(
             Audience.endAudience(builder)
         }
 
-    private fun PRECONDITIONSTATEREF.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun PRECONDITIONSTATEREF.offsetPreConditionStateRef(): Int =
+        cachedWithPath {
             val state =
-                odx.resolveState(this)?.offset() ?: error("Couldn't find STATE ${this.idref}")
-            val value = this.value?.offset()
-            val inParamIfSnRef = this.inparamifsnref?.shortname?.offset()
-            val inParamIfSnPathRef = this.inparamifsnpathref?.shortnamepath?.offset()
+                odx.resolveState(this)?.offsetState() ?: odxlinkFailure("STATE", this, this.idref, this.docref)
+            val value = this.value?.offsetString()
+            val inParamIfSnRef = this.inparamifsnref?.shortname?.offsetString()
+            val inParamIfSnPathRef = this.inparamifsnpathref?.shortnamepath?.offsetString()
 
             PreConditionStateRef.startPreConditionStateRef(builder)
             PreConditionStateRef.addState(builder, state)
@@ -1632,15 +1795,15 @@ class DatabaseWriter(
             PreConditionStateRef.endPreConditionStateRef(builder)
         }
 
-    private fun STATETRANSITIONREF.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val value = this.value?.offset()
+    private fun STATETRANSITIONREF.offsetStateTransitionRef(): Int =
+        cachedWithPath {
+            val value = this.value?.offsetString()
             val stateTransition =
                 this.idref?.let {
                     val stateTransition =
                         odx.resolveStateTransition(this)
-                            ?: error("Couldn't find STATETRANSITION ${this.idref}")
-                    stateTransition.offset()
+                            ?: odxlinkFailure("STATE-TRANSITION", this, this.idref!!, this.docref)
+                    stateTransition.offsetStateTransition()
                 }
 
             StateTransitionRef.startStateTransitionRef(builder)
@@ -1651,18 +1814,18 @@ class DatabaseWriter(
             StateTransitionRef.endStateTransitionRef(builder)
         }
 
-    private fun INPUTPARAM.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-            val longName = this.longname?.offset()
-            val physicalDefaultValue = this.physicaldefaultvalue?.offset()
-            val semantic = this.semantic?.offset()
+    private fun INPUTPARAM.offsetJobParamInput(): Int =
+        this.cachedWithPath {
+            val shortName = this.shortname.offsetString()
+            val longName = this.longname?.offsetLongName()
+            val physicalDefaultValue = this.physicaldefaultvalue?.offsetString()
+            val semantic = this.semantic?.offsetString()
             val dop =
                 this.dopbaseref?.let {
                     val dop =
                         odx.resolveCombinedDop(it)
-                            ?: error("Can't find DOP ${it.idref}")
-                    dop.offset()
+                            ?: odxlinkFailure("DOP", it)
+                    dop.offsetDOP()
                 }
 
             JobParam.startJobParam(builder)
@@ -1674,17 +1837,17 @@ class DatabaseWriter(
             JobParam.endJobParam(builder)
         }
 
-    private fun OUTPUTPARAM.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-            val longName = this.longname?.offset()
-            val semantic = this.semantic?.offset()
+    private fun OUTPUTPARAM.offsetJobParamOutput(): Int =
+        this.cachedWithPath {
+            val shortName = this.shortname.offsetString()
+            val longName = this.longname?.offsetLongName()
+            val semantic = this.semantic?.offsetString()
             val dop =
                 this.dopbaseref?.let {
                     val dop =
                         odx.resolveCombinedDop(it)
-                            ?: error("Can't find DOP ${it.idref}")
-                    dop.offset()
+                            ?: odxlinkFailure("DOP", it)
+                    dop.offsetDOP()
                 }
 
             JobParam.startJobParam(builder)
@@ -1695,16 +1858,16 @@ class DatabaseWriter(
             JobParam.endJobParam(builder)
         }
 
-    private fun NEGOUTPUTPARAM.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-            val longName = this.longname?.offset()
+    private fun NEGOUTPUTPARAM.offsetJobParamNegOutput(): Int =
+        this.cachedWithPath {
+            val shortName = this.shortname.offsetString()
+            val longName = this.longname?.offsetLongName()
             val dop =
                 this.dopbaseref?.let {
                     val dop =
                         odx.resolveCombinedDop(it)
-                            ?: error("Can't find DOP ${it.idref}")
-                    dop.offset()
+                            ?: odxlinkFailure("DOP", it)
+                    dop.offsetDOP()
                 }
 
             JobParam.startJobParam(builder)
@@ -1715,8 +1878,8 @@ class DatabaseWriter(
         }
 
     private fun DIAGCOMM.offsetInternal(): Int {
-        val shortName = this.shortname.offset()
-        val longName = this.longname?.offset()
+        val shortName = this.shortname.offsetString()
+        val longName = this.longname?.offsetLongName()
         val diagClass = this.diagnosticclass?.toFileFormatEnum()
         val functClasses =
             this.functclassrefs
@@ -1724,18 +1887,18 @@ class DatabaseWriter(
                 ?.map {
                     val functClass =
                         odx.resolveFunctClass(it)
-                            ?: error("Couldn't find funct class ${it.idref}")
-                    functClass.offset()
+                            ?: odxlinkFailure("FUNCT-CLASS", it)
+                    functClass.offsetFunctClass()
                 }?.toIntArray()
                 ?.let {
                     DiagComm.createFunctClassVector(builder, it)
                 }
-        val semantic = this.semantic?.offset()
+        val semantic = this.semantic?.offsetString()
         val preconditionStateRefs =
             this.preconditionstaterefs
                 ?.preconditionstateref
                 ?.map {
-                    it.offset()
+                    it.offsetPreConditionStateRef()
                 }?.toIntArray()
                 ?.let {
                     DiagComm.createPreConditionStateRefsVector(builder, it)
@@ -1744,7 +1907,7 @@ class DatabaseWriter(
             this.statetransitionrefs
                 ?.statetransitionref
                 ?.map {
-                    it.offset()
+                    it.offsetStateTransitionRef()
                 }?.toIntArray()
                 ?.let {
                     DiagComm.createStateTransitionRefsVector(builder, it)
@@ -1755,14 +1918,14 @@ class DatabaseWriter(
                 ?.map {
                     val protocol =
                         odx.resolveProtocolByShortName(it.shortname)
-                            ?: error("Couldn't find protocol ${it.shortname}")
-                    protocol.offset()
+                            ?: snrefFailure("PROTOCOL", it.shortname, this, odx.protocols.map { it.shortname })
+                    protocol.offsetProtocol()
                 }?.toIntArray()
                 ?.let {
                     DiagComm.createProtocolsVector(builder, it)
                 }
-        val audience = this.audience?.offset()
-        val sdgs = this.sdgs?.offset()
+        val audience = this.audience?.offsetAudience()
+        val sdgs = this.sdgs?.offsetSDGS()
 
         DiagComm.startDiagComm(builder)
         DiagComm.addShortName(builder, shortName)
@@ -1781,14 +1944,14 @@ class DatabaseWriter(
         return DiagComm.endDiagComm(builder)
     }
 
-    private fun SINGLEECUJOB.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun SINGLEECUJOB.offsetSingleEcuJob(): Int =
+        this.cachedWithPath {
             val diagComm = (this as DIAGCOMM).offsetInternal()
             val progCodes =
                 this.progcodes
                     ?.progcode
                     ?.map {
-                        it.offset()
+                        it.offsetProgCode()
                     }?.toIntArray()
                     ?.let {
                         SingleEcuJob.createProgCodesVector(builder, it)
@@ -1797,7 +1960,7 @@ class DatabaseWriter(
                 this.inputparams
                     ?.inputparam
                     ?.map {
-                        it.offset()
+                        it.offsetJobParamInput()
                     }?.toIntArray()
                     ?.let {
                         SingleEcuJob.createInputParamsVector(builder, it)
@@ -1806,7 +1969,7 @@ class DatabaseWriter(
                 this.outputparams
                     ?.outputparam
                     ?.map {
-                        it.offset()
+                        it.offsetJobParamOutput()
                     }?.toIntArray()
                     ?.let {
                         SingleEcuJob.createOutputParamsVector(builder, it)
@@ -1815,7 +1978,7 @@ class DatabaseWriter(
                 this.negoutputparams
                     ?.negoutputparam
                     ?.map {
-                        it.offset()
+                        it.offsetJobParamNegOutput()
                     }?.toIntArray()
                     ?.let {
                         SingleEcuJob.createNegOutputParamsVector(builder, it)
@@ -1831,14 +1994,14 @@ class DatabaseWriter(
         }
 
     private fun DIAGLAYER.offsetInternal(comparamRefs: Int?): Int {
-        val shortName = this.shortname.offset()
-        val longName = this.longname?.offset()
-        val sdgs = this.sdgs?.offset()
+        val shortName = this.shortname.offsetString()
+        val longName = this.longname?.offsetLongName()
+        val sdgs = this.sdgs?.offsetSDGS()
         val functClasses =
             this.functclasss
                 ?.functclass
                 ?.map {
-                    it.offset()
+                    it.offsetFunctClass()
                 }?.toIntArray()
                 ?.let {
                     DiagLayer.createFunctClassesVector(builder, it)
@@ -1847,7 +2010,7 @@ class DatabaseWriter(
             this.additionalaudiences
                 ?.additionalaudience
                 ?.map {
-                    it.offset()
+                    it.offsetAdditionalAudience()
                 }?.toIntArray()
                 ?.let {
                     DiagLayer.createAdditionalAudiencesVector(builder, it)
@@ -1858,19 +2021,19 @@ class DatabaseWriter(
                 ?.filterIsInstance<ODXLINK>()
                 ?.map {
                     odx.resolveDiagService(it) ?: odx.resolveSingleEcuJob(it)
-                        ?: error("Couldn't find reference ${it.idref}")
+                        ?: odxlinkFailure("DIAG-SERVICE / SINGLE-ECU-JOB", it)
                 }?.filterByConverterOptions(options) ?: emptyList()
 
         val diagServicesRaw =
             resolvedLinks.filterIsInstance<DIAGSERVICE>().map {
-                it.offset()
+                it.offsetDiagService()
             } + (
                 this.diagcomms
                     ?.diagcommproxy
                     ?.filterIsInstance<DIAGSERVICE>()
                     ?.filterByConverterOptions(options)
                     ?.map {
-                        it.offset()
+                        it.offsetDiagService()
                     } ?: emptyList()
             )
 
@@ -1881,14 +2044,14 @@ class DatabaseWriter(
 
         val singleEcuJobsRaw =
             resolvedLinks.filterIsInstance<SINGLEECUJOB>().map {
-                it.offset()
+                it.offsetSingleEcuJob()
             } + (
                 this.diagcomms
                     ?.diagcommproxy
                     ?.filterIsInstance<SINGLEECUJOB>()
                     ?.filterByConverterOptions(options)
                     ?.map {
-                        it.offset()
+                        it.offsetSingleEcuJob()
                     } ?: emptyList()
             )
 
@@ -1900,7 +2063,7 @@ class DatabaseWriter(
             statecharts
                 ?.statechart
                 ?.map {
-                    it.offset()
+                    it.offsetStateChart()
                 }?.toIntArray()
                 ?.let {
                     DiagLayer.createStateChartsVector(builder, it)
@@ -1927,7 +2090,7 @@ class DatabaseWriter(
             this.comparamrefs
                 ?.comparamref
                 ?.map {
-                    it.offset()
+                    it.offsetComParamRef()
                 }?.toIntArray()
                 ?.let {
                     DiagLayer.createComParamRefsVector(builder, it)
@@ -1937,15 +2100,15 @@ class DatabaseWriter(
         return diagLayer
     }
 
-    private fun BASEVARIANT.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun BASEVARIANT.offsetVariantBase(): Int =
+        this.cachedWithPath {
             val diagLayer = (this as HIERARCHYELEMENT).offsetType()
             val pattern =
                 this.basevariantpattern
                     ?.matchingbasevariantparameters
                     ?.matchingbasevariantparameter
                     ?.map {
-                        it.offset()
+                        it.offsetMatchingParameterBase()
                     }?.toIntArray()
                     ?.let {
                         Variant.createVariantPatternVector(builder, it)
@@ -1954,7 +2117,7 @@ class DatabaseWriter(
                 this.parentrefs
                     ?.parentref
                     ?.map {
-                        it.offset()
+                        it.offsetParentRef()
                     }?.toIntArray()
                     ?.let {
                         Variant.createParentRefsVector(builder, it)
@@ -1968,14 +2131,14 @@ class DatabaseWriter(
             Variant.endVariant(builder)
         }
 
-    private fun ECUVARIANT.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun ECUVARIANT.offsetVariantEcu(): Int =
+        this.cachedWithPath {
             val diagLayer = (this as HIERARCHYELEMENT).offsetType()
             val pattern =
                 this.ecuvariantpatterns
                     ?.ecuvariantpattern
                     ?.map {
-                        it.offset()
+                        it.offsetVariantPattern()
                     }?.toIntArray()
                     ?.let {
                         Variant.createVariantPatternVector(builder, it)
@@ -1984,7 +2147,7 @@ class DatabaseWriter(
                 this.parentrefs
                     ?.parentref
                     ?.map {
-                        it.offset()
+                        it.offsetParentRef()
                     }?.toIntArray()
                     ?.let {
                         Variant.createParentRefsVector(builder, it)
@@ -1998,8 +2161,8 @@ class DatabaseWriter(
             Variant.endVariant(builder)
         }
 
-    private fun ECUSHAREDDATA.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun ECUSHAREDDATA.offsetEcuSharedData(): Int =
+        this.cachedWithPath {
             if (this.diagvariables?.diagvariableproxy?.isNotEmpty() == true) {
                 logger.warning("DiagVariables from ${this.id} are not supported yet")
                 if (!options.lenient) {
@@ -2020,17 +2183,17 @@ class DatabaseWriter(
             EcuSharedData.endEcuSharedData(builder)
         }
 
-    fun PARENTREF.offset(): Int {
+    fun PARENTREF.offsetParentRef(): Int {
         val resolved =
-            odx.resolveParent(this) ?: throw IllegalStateException("Couldn't resolve parent for idref ${this.idref}")
+            odx.resolveParent(this) ?: odxlinkFailure("PARENT", this, this.idref, this.docref)
         val resolvedOffs =
             when (resolved) {
-                is BASEVARIANT -> resolved.offset()
-                is ECUVARIANT -> resolved.offset()
-                is PROTOCOL -> resolved.offset()
-                is TABLE -> resolved.offset()
-                is FUNCTIONALGROUP -> resolved.offset()
-                is ECUSHAREDDATA -> resolved.offset()
+                is BASEVARIANT -> resolved.offsetVariantBase()
+                is ECUVARIANT -> resolved.offsetVariantEcu()
+                is PROTOCOL -> resolved.offsetProtocol()
+                is TABLE -> resolved.offsetTableDop()
+                is FUNCTIONALGROUP -> resolved.offsetFunctionalGroup()
+                is ECUSHAREDDATA -> resolved.offsetEcuSharedData()
                 else -> throw UnsupportedOperationException("Unsupported idref type: ${this.idref} / ${this.doctype?.value()} ($resolved)")
             }
         val resolvedOffsType =
@@ -2047,7 +2210,7 @@ class DatabaseWriter(
             this.notinheriteddiagcomms
                 ?.notinheriteddiagcomm
                 ?.map {
-                    it.diagcommsnref.shortname.offset()
+                    it.diagcommsnref.shortname.offsetString()
                 }?.toIntArray()
                 ?.let {
                     ParentRef.createNotInheritedDiagCommShortNamesVector(builder, it)
@@ -2056,7 +2219,7 @@ class DatabaseWriter(
             this.notinheriteddops
                 ?.notinheriteddop
                 ?.map {
-                    it.dopbasesnref.shortname.offset()
+                    it.dopbasesnref.shortname.offsetString()
                 }?.toIntArray()
                 ?.let {
                     ParentRef.createNotInheritedDopsShortNamesVector(builder, it)
@@ -2065,7 +2228,7 @@ class DatabaseWriter(
             this.notinheritedtables
                 ?.notinheritedtable
                 ?.map {
-                    it.tablesnref.shortname.offset()
+                    it.tablesnref.shortname.offsetString()
                 }?.toIntArray()
                 ?.let {
                     ParentRef.createNotInheritedTablesShortNamesVector(builder, it)
@@ -2074,7 +2237,7 @@ class DatabaseWriter(
             this.notinheritedvariables
                 ?.notinheritedvariable
                 ?.map {
-                    it.diagvariablesnref.shortname.offset()
+                    it.diagvariablesnref.shortname.offsetString()
                 }?.toIntArray()
                 ?.let {
                     ParentRef.createNotInheritedVariablesShortNamesVector(builder, it)
@@ -2083,7 +2246,7 @@ class DatabaseWriter(
             this.notinheritedglobalnegresponses
                 ?.notinheritedglobalnegresponse
                 ?.map {
-                    it.globalnegresponsesnref.shortname.offset()
+                    it.globalnegresponsesnref.shortname.offsetString()
                 }?.toIntArray()
                 ?.let {
                     ParentRef.createNotInheritedGlobalNegResponsesShortNamesVector(builder, it)
@@ -2105,14 +2268,14 @@ class DatabaseWriter(
         return ParentRef.endParentRef(builder)
     }
 
-    private fun FUNCTIONALGROUP.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun FUNCTIONALGROUP.offsetFunctionalGroup(): Int =
+        this.cachedWithPath {
             val diagLayer = (this as HIERARCHYELEMENT).offsetType()
             val parentRefs =
                 this.parentrefs
                     ?.parentref
                     ?.map {
-                        it.offset()
+                        it.offsetParentRef()
                     }?.toIntArray()
                     ?.let {
                         FunctionalGroup.createParentRefsVector(builder, it)
@@ -2124,34 +2287,34 @@ class DatabaseWriter(
             FunctionalGroup.endFunctionalGroup(builder)
         }
 
-    private fun MATCHINGBASEVARIANTPARAMETER.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun MATCHINGBASEVARIANTPARAMETER.offsetMatchingParameterBase(): Int =
+        this.cachedWithPath {
             if (this.outparamifsnpathref != null) {
                 error("Unsupported outparam if sn path ref")
             }
 
-            val expectedValue = this.expectedvalue.offset()
+            val expectedValue = this.expectedvalue.offsetString()
             lateinit var diagService: DIAGSERVICE
             val diagServiceOffset =
                 this.diagcommsnref.shortname.let { shortname ->
                     diagService = collectionOf(this).resolveDiagServiceByShortName(shortname)
-                        ?: error("Couldn't find diag service $shortname")
-                    diagService.offset()
+                        ?: snrefFailure("DIAG-SERVICE", shortname, this, collectionOf(this).diagServicesByShortName.keys)
+                    diagService.offsetDiagService()
                 }
 
             val outParam =
                 this.outparamifsnref?.shortname?.let { expectedShortName ->
-                    diagService.posresponserefs
-                        ?.posresponseref
-                        ?.flatMap { pr ->
-                            val posResponse =
-                                odx.resolvePosResponse(pr)
-                                    ?: error("Couldn't find pos response ${pr.idref}")
-                            posResponse.params?.param ?: emptyList()
-                        }?.firstOrNull { params ->
-                            params.shortname == expectedShortName
-                        }?.offset()
-                        ?: error("Couldn't find param for shortName $expectedShortName")
+                    val allParams =
+                        diagService.posresponserefs
+                            ?.posresponseref
+                            ?.flatMap { pr ->
+                                val posResponse =
+                                    odx.resolvePosResponse(pr)
+                                        ?: return@let null
+                                posResponse.params?.param ?: emptyList()
+                            } ?: emptyList()
+                    allParams.firstOrNull { it.shortname == expectedShortName }?.offsetParam()
+                        ?: posResponseParamFailure(expectedShortName, this, diagService, allParams)
                 }
 
             MatchingParameter.startMatchingParameter(builder)
@@ -2162,29 +2325,29 @@ class DatabaseWriter(
             MatchingParameter.endMatchingParameter(builder)
         }
 
-    private fun MATCHINGPARAMETER.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val expectedValue = this.expectedvalue?.offset()
+    private fun MATCHINGPARAMETER.offsetMatchingParameter(): Int =
+        this.cachedWithPath {
+            val expectedValue = this.expectedvalue?.offsetString()
             lateinit var diagService: DIAGSERVICE
             val diagServiceOffset =
                 this.diagcommsnref.shortname.let { shortname ->
                     diagService = collectionOf(this).resolveDiagServiceByShortName(shortname)
-                        ?: error("Couldn't find diag service $shortname")
-                    diagService.offset()
+                        ?: snrefFailure("DIAG-SERVICE", shortname, this, collectionOf(this).diagServicesByShortName.keys)
+                    diagService.offsetDiagService()
                 }
             val outParam =
                 this.outparamifsnref?.shortname?.let { expectedShortName ->
-                    diagService.posresponserefs
-                        ?.posresponseref
-                        ?.flatMap { pr ->
-                            val posResponse =
-                                odx.resolvePosResponse(pr)
-                                    ?: error("Couldn't find pos response ${pr.idref}")
-                            posResponse.params?.param ?: emptyList()
-                        }?.firstOrNull { params ->
-                            params.shortname == expectedShortName
-                        }?.offset()
-                        ?: error("Couldn't find param for shortName $expectedShortName")
+                    val allParams =
+                        diagService.posresponserefs
+                            ?.posresponseref
+                            ?.flatMap { pr ->
+                                val posResponse =
+                                    odx.resolvePosResponse(pr)
+                                        ?: return@let null
+                                posResponse.params?.param ?: emptyList()
+                            } ?: emptyList()
+                    allParams.firstOrNull { it.shortname == expectedShortName }?.offsetParam()
+                        ?: posResponseParamFailure(expectedShortName, this, diagService, allParams)
                 }
 
             this.outparamifsnpathref?.let {
@@ -2198,13 +2361,13 @@ class DatabaseWriter(
             MatchingParameter.endMatchingParameter(builder)
         }
 
-    private fun ECUVARIANTPATTERN.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun ECUVARIANTPATTERN.offsetVariantPattern(): Int =
+        this.cachedWithPath {
             val matchingParameter =
                 this.matchingparameters
                     ?.matchingparameter
                     ?.map {
-                        it.offset()
+                        it.offsetMatchingParameter()
                     }?.toIntArray()
                     ?.let {
                         Variant.createVariantPatternVector(builder, it)
@@ -2214,13 +2377,13 @@ class DatabaseWriter(
             VariantPattern.endVariantPattern(builder)
         }
 
-    private fun COMPARAMSUBSET.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun COMPARAMSUBSET.offsetComParamSubSet(): Int =
+        cachedWithPath {
             val comParams =
                 this.comparams
                     ?.comparam
                     ?.map {
-                        it.offset()
+                        it.offsetComParamSimple()
                     }?.toIntArray()
                     ?.let {
                         ComParamSubSet.createComParamsVector(builder, it)
@@ -2229,7 +2392,7 @@ class DatabaseWriter(
                 this.complexcomparams
                     ?.complexcomparam
                     ?.map {
-                        it.offset()
+                        it.offsetComParamComplex()
                     }?.toIntArray()
                     ?.let {
                         ComParamSubSet.createComplexComParamsVector(builder, it)
@@ -2238,12 +2401,12 @@ class DatabaseWriter(
                 this.dataobjectprops
                     ?.dataobjectprop
                     ?.map {
-                        it.offset()
+                        it.offsetDOP()
                     }?.toIntArray()
                     ?.let {
                         ComParamSubSet.createDataObjectPropsVector(builder, it)
                     }
-            val unitSpec = this.unitspec?.offset()
+            val unitSpec = this.unitspec?.offsetUnitSpec()
 
             ComParamSubSet.startComParamSubSet(builder)
             comParams?.let { ComParamSubSet.addComParams(builder, it) }
@@ -2253,16 +2416,16 @@ class DatabaseWriter(
             ComParamSubSet.endComParamSubSet(builder)
         }
 
-    private fun UNITGROUP.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-            val longName = this.longname?.offset()
+    private fun UNITGROUP.offsetUnitGroup(): Int =
+        this.cachedWithPath {
+            val shortName = this.shortname.offsetString()
+            val longName = this.longname?.offsetLongName()
             val units =
                 this.unitrefs
                     ?.unitref
                     ?.map {
-                        val unit = odx.resolveUnit(it) ?: error("Couldn't find unit $it")
-                        unit.offset()
+                        val unit = odx.resolveUnit(it) ?: odxlinkFailure("UNIT", it)
+                        unit.offsetUnit()
                     }?.toIntArray()
                     ?.let {
                         UnitGroup.createUnitrefsVector(builder, it)
@@ -2275,26 +2438,26 @@ class DatabaseWriter(
             UnitGroup.endUnitGroup(builder)
         }
 
-    private fun UNITSPEC.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun UNITSPEC.offsetUnitSpec(): Int =
+        cachedWithPath {
             val unitGroups =
-                this.unitgroups?.unitgroup?.map { it.offset() }?.toIntArray()?.let {
+                this.unitgroups?.unitgroup?.map { it.offsetUnitGroup() }?.toIntArray()?.let {
                     UnitSpec.createUnitGroupsVector(builder, it)
                 }
             val physicalDimensions =
-                this.physicaldimensions?.physicaldimension?.map { it.offset() }?.toIntArray()?.let {
+                this.physicaldimensions?.physicaldimension?.map { it.offsetPhysicalDimension() }?.toIntArray()?.let {
                     UnitSpec.createPhysicalDimensionsVector(builder, it)
                 }
             val units =
                 this.units
                     ?.unit
                     ?.map {
-                        it.offset()
+                        it.offsetUnit()
                     }?.toIntArray()
                     ?.let {
                         UnitSpec.createUnitsVector(builder, it)
                     }
-            val sdgs = this.sdgs?.let { it.offset() }
+            val sdgs = this.sdgs?.let { it.offsetSDGS() }
 
             UnitSpec.startUnitSpec(builder)
             unitGroups?.let { UnitSpec.addUnitGroups(builder, it) }
@@ -2304,24 +2467,24 @@ class DatabaseWriter(
             UnitSpec.endUnitSpec(builder)
         }
 
-    private fun COMPARAM.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-            val longName = this.longname?.offset()
-            val paramClass = this.paramclass?.offset()
+    private fun COMPARAM.offsetComParamSimple(): Int =
+        this.cachedWithPath {
+            val shortName = this.shortname.offsetString()
+            val longName = this.longname?.offsetLongName()
+            val paramClass = this.paramclass?.offsetString()
             val comParamType = this.cptype?.toFileFormatEnum()
             val comParamUsage = this.cpusage?.toFileFormatEnum()
             val displayLevel = this.displaylevel?.toUInt()
 
             val regularComParam =
                 this.let {
-                    val physicalDefaultValue = this.physicaldefaultvalue?.offset()
+                    val physicalDefaultValue = this.physicaldefaultvalue?.offsetString()
                     val dop =
                         this.dataobjectpropref?.let {
                             val dop =
                                 odx.resolveCombinedDop(it)
-                                    ?: error("Couldn't find ${it.idref}")
-                            dop.offset()
+                                    ?: odxlinkFailure("DOP", it)
+                            dop.offsetDOP()
                         }
 
                     RegularComParam.startRegularComParam(builder)
@@ -2343,22 +2506,22 @@ class DatabaseWriter(
             ComParam.endComParam(builder)
         }
 
-    private fun SIMPLEVALUE.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val value = this.value?.offset()
+    private fun SIMPLEVALUE.offsetSimpleValue(): Int =
+        cachedWithPath {
+            val value = this.value?.offsetString()
             SimpleValue.startSimpleValue(builder)
             value?.let { SimpleValue.addValue(builder, it) }
             SimpleValue.endSimpleValue(builder)
         }
 
-    private fun COMPLEXVALUE.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun COMPLEXVALUE.offsetComplexValue(): Int =
+        cachedWithPath {
             val entries =
                 this.simplevalueOrCOMPLEXVALUE
                     ?.map {
                         when (it) {
-                            is SIMPLEVALUE -> it.offset()
-                            is COMPLEXVALUE -> it.offset()
+                            is SIMPLEVALUE -> it.offsetSimpleValue()
+                            is COMPLEXVALUE -> it.offsetComplexValue()
                             else -> error("Unknown object type ${this.javaClass.simpleName}")
                         }
                     }?.toIntArray()
@@ -2385,11 +2548,11 @@ class DatabaseWriter(
             ComplexValue.endComplexValue(builder)
         }
 
-    private fun COMPLEXCOMPARAM.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-            val longName = this.longname?.offset()
-            val paramClass = this.paramclass?.offset()
+    private fun COMPLEXCOMPARAM.offsetComParamComplex(): Int =
+        this.cachedWithPath {
+            val shortName = this.shortname.offsetString()
+            val longName = this.longname?.offsetLongName()
+            val paramClass = this.paramclass?.offsetString()
             val comParamType = this.cptype?.toFileFormatEnum()
             val comParamUsage = this.cpusage?.toFileFormatEnum()
             val displayLevel = this.displaylevel?.toUInt()
@@ -2399,8 +2562,8 @@ class DatabaseWriter(
                         this.comparamOrCOMPLEXCOMPARAM
                             ?.map {
                                 when (it) {
-                                    is COMPARAM -> it.offset()
-                                    is COMPLEXCOMPARAM -> it.offset()
+                                    is COMPARAM -> it.offsetComParamSimple()
+                                    is COMPLEXCOMPARAM -> it.offsetComParamComplex()
                                     else -> error("Unknown com param type ${it.id}")
                                 }
                             }?.toIntArray()
@@ -2413,7 +2576,7 @@ class DatabaseWriter(
                             ?.complexvalues
                             ?.complexvalue
                             ?.map {
-                                it.offset()
+                                it.offsetComplexValue()
                             }?.toIntArray()
                             ?.let {
                                 ComplexComParam.createComplexPhysicalDefaultValuesVector(builder, it)
@@ -2439,10 +2602,10 @@ class DatabaseWriter(
             ComParam.endComParam(builder)
         }
 
-    private fun STATE.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-            val longName = this.longname?.offset()
+    private fun STATE.offsetState(): Int =
+        this.cachedWithPath {
+            val shortName = this.shortname.offsetString()
+            val longName = this.longname?.offsetLongName()
 
             dataformat.State.startState(builder)
             dataformat.State.addShortName(builder, shortName)
@@ -2451,10 +2614,10 @@ class DatabaseWriter(
             dataformat.State.endState(builder)
         }
 
-    private fun PHYSICALDIMENSION.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-            val longname = this.longname?.offset()
+    private fun PHYSICALDIMENSION.offsetPhysicalDimension(): Int =
+        this.cachedWithPath {
+            val shortName = this.shortname.offsetString()
+            val longname = this.longname?.offsetLongName()
 
             PhysicalDimension.startPhysicalDimension(builder)
 
@@ -2468,31 +2631,31 @@ class DatabaseWriter(
             this.temperatureexp?.let { PhysicalDimension.addTemperatureExp(builder, it) }
             this.timeexp?.let { PhysicalDimension.addTimeExp(builder, it) }
 
-            return PhysicalDimension.endPhysicalDimension(builder)
+            PhysicalDimension.endPhysicalDimension(builder)
         }
 
-    private fun PROTOCOL.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun PROTOCOL.offsetProtocol(): Int =
+        this.cachedWithPath {
             val diagLayer = (this as DIAGLAYER).offsetType()
             val comparamSpecs =
                 this.comparamspecref?.let {
                     val comParamSpec =
                         odx.resolveComParamSpec(it)
-                            ?: error("Couldn't find com param spec ${it.idref}")
-                    comParamSpec.offset()
+                            ?: odxlinkFailure("COMPARAM-SPEC", it)
+                    comParamSpec.offsetComParamSpec()
                 }
             val protStack =
                 this.protstacksnref?.let { protStack ->
                     val stack =
                         odx.resolveProtStackByShortName(protStack.shortname)
-                            ?: error("Couldn't find protstack with short name ${protStack.shortname}")
-                    stack.offset()
+                            ?: snrefFailure("PROT-STACK", protStack.shortname, this, odx.protStacks.map { it.shortname })
+                    stack.offsetProtStack()
                 }
 
             val parentRefs =
                 this.parentrefs
                     ?.parentref
-                    ?.map { it.offset() }
+                    ?.map { it.offsetParentRef() }
                     ?.toIntArray()
                     ?.let {
                         Protocol.createParentRefsVector(builder, it)
@@ -2506,13 +2669,13 @@ class DatabaseWriter(
             Protocol.endProtocol(builder)
         }
 
-    private fun COMPARAMSPEC.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun COMPARAMSPEC.offsetComParamSpec(): Int =
+        cachedWithPath {
             val protStacks =
                 this.protstacks
                     ?.protstack
                     ?.map {
-                        it.offset()
+                        it.offsetProtStack()
                     }?.toIntArray()
                     ?.let {
                         ComParamSpec.createProtStacksVector(builder, it)
@@ -2522,24 +2685,24 @@ class DatabaseWriter(
             ComParamSpec.endComParamSpec(builder)
         }
 
-    private fun PROTSTACK.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-            val longName = this.longname?.offset()
+    private fun PROTSTACK.offsetProtStack(): Int =
+        this.cachedWithPath {
+            val shortName = this.shortname.offsetString()
+            val longName = this.longname?.offsetLongName()
             val comparamSubSets =
                 this.comparamsubsetrefs
                     ?.comparamsubsetref
                     ?.map {
                         val comparamSubSet =
                             odx.resolveComParamSubSet(it)
-                                ?: error("Couldn't find com param subset ${it.idref}")
-                        comparamSubSet.offset()
+                                ?: odxlinkFailure("COMPARAM-SUBSET", it)
+                        comparamSubSet.offsetComParamSubSet()
                     }?.toIntArray()
                     ?.let {
                         ProtStack.createComparamSubsetRefsVector(builder, it)
                     }
-            val physicalLinkType = this.physicallinktype?.offset()
-            val pduProtocolType = this.pduprotocoltype?.offset()
+            val physicalLinkType = this.physicallinktype?.offsetString()
+            val pduProtocolType = this.pduprotocoltype?.offsetString()
 
             ProtStack.startProtStack(builder)
             ProtStack.addShortName(builder, shortName)
@@ -2550,37 +2713,56 @@ class DatabaseWriter(
             ProtStack.endProtStack(builder)
         }
 
-    private fun COMPARAMREF.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun COMPARAMREF.offsetComParamRef(): Int =
+        cachedWithPath {
             val comParam =
-                odx.resolveComparam(this)?.offset()
-                    ?: odx.resolveComplexComparam(this)?.offset()
+                odx.resolveComparam(this)?.offsetComParamSimple()
+                    ?: odx.resolveComplexComparam(this)?.offsetComParamComplex()
 
             if (comParam == null) {
+                val message =
+                    resolutionMessage(
+                        ResolutionContext(
+                            expected = "COMPARAM / COMPLEX-COMPARAM",
+                            refKind = "ODXLINK",
+                            refValue = this.idref,
+                            docref = this.docref,
+                            scopeSearched = this.docref ?: odx.collectionFor(this)?.containerKey,
+                            sourceFile = odx.sourceFileFor(this),
+                            logicalPath =
+                                elementPath.takeIf { it.isNotEmpty() }?.let { formatElementPath(it) },
+                            candidates = odx.comparamCandidates(this),
+                        ),
+                    )
                 if (!options.lenient) {
-                    error("Couldn't find COMPARAM ${this.idref} @ ${this.docref}")
+                    throw OdxResolutionException(message)
                 }
-                logger.warning("Couldn't find COMPARAM ${this.idref} @ ${this.docref}")
+                logger.warning(message)
             }
 
-            val simpleValue = this.simplevalue?.offset()
-            val complexValue = this.complexvalue?.offset()
+            val simpleValue = this.simplevalue?.offsetSimpleValue()
+            val complexValue = this.complexvalue?.offsetComplexValue()
 
             val protocol =
                 this.protocolsnref?.shortname?.let { shortName ->
                     val protocolOdx =
                         odx.resolveProtocolByShortName(shortName)
-                            ?: error("Couldn't find PROTOCOL $shortName")
-                    protocolOdx.offset()
+                            ?: snrefFailure("PROTOCOL", shortName, this, odx.protocols.map { it.shortname })
+                    protocolOdx.offsetProtocol()
                 }
 
             val protStack =
                 this.protstacksnref?.let {
                     val protStackOdx =
                         odx.resolveProtStackByShortName(this.protstacksnref.shortname)
-                            ?: error("Can't find prot stack ${this.protstacksnref.shortname}")
+                            ?: snrefFailure(
+                                "PROT-STACK",
+                                this.protstacksnref.shortname,
+                                this,
+                                odx.protStacks.map { it.shortname },
+                            )
 
-                    protStackOdx.offset()
+                    protStackOdx.offsetProtStack()
                 }
 
             ComParamRef.startComParamRef(builder)
@@ -2592,20 +2774,20 @@ class DatabaseWriter(
             ComParamRef.endComParamRef(builder)
         }
 
-    private fun STATECHART.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-            val semantic = this.semantic.offset()
+    private fun STATECHART.offsetStateChart(): Int =
+        this.cachedWithPath {
+            val shortName = this.shortname.offsetString()
+            val semantic = this.semantic.offsetString()
             val stateTransitions =
                 this.statetransitions?.statetransition?.let { transitions ->
-                    val data = transitions.map { it.offset() }.toIntArray()
+                    val data = transitions.map { it.offsetStateTransition() }.toIntArray()
                     StateChart.createStateTransitionsVector(builder, data)
                 }
-            val startStateShortName = this.startstatesnref.shortname.offset()
+            val startStateShortName = this.startstatesnref.shortname.offsetString()
 
             val states =
                 this.states?.state?.let { states ->
-                    val data = states.map { it.offset() }.toIntArray()
+                    val data = states.map { it.offsetState() }.toIntArray()
                     StateChart.createStatesVector(builder, data)
                 }
 
@@ -2619,11 +2801,11 @@ class DatabaseWriter(
             StateChart.endStateChart(builder)
         }
 
-    private fun STATETRANSITION.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-            val sourceShortNameRef = this.sourcesnref.shortname.offset()
-            val targetShortNameRef = this.targetsnref.shortname.offset()
+    private fun STATETRANSITION.offsetStateTransition(): Int =
+        this.cachedWithPath {
+            val shortName = this.shortname.offsetString()
+            val sourceShortNameRef = this.sourcesnref.shortname.offsetString()
+            val targetShortNameRef = this.targetsnref.shortname.offsetString()
 
             StateTransition.startStateTransition(builder)
 
@@ -2634,11 +2816,11 @@ class DatabaseWriter(
             StateTransition.endStateTransition(builder)
         }
 
-    private fun SWITCHKEY.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun SWITCHKEY.offsetSwitchKey(): Int =
+        cachedWithPath {
             val dop =
-                odx.resolveCombinedDop(this.dataobjectpropref)?.offset()
-                    ?: error("Couldn't find dop-ref ${this.dataobjectpropref.idref}")
+                odx.resolveCombinedDop(this.dataobjectpropref)?.offsetDOP()
+                    ?: odxlinkFailure("DOP", this.dataobjectpropref)
 
             SwitchKey.startSwitchKey(builder)
             SwitchKey.addBytePosition(builder, this.byteposition.toUInt())
@@ -2647,16 +2829,16 @@ class DatabaseWriter(
             SwitchKey.endSwitchKey(builder)
         }
 
-    private fun DEFAULTCASE.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-            val longName = this.longname?.offset()
+    private fun DEFAULTCASE.offsetDefaultCase(): Int =
+        cachedWithPath {
+            val shortName = this.shortname.offsetString()
+            val longName = this.longname?.offsetLongName()
             val structure =
                 this.structureref?.let {
                     val dop =
                         odx.resolveCombinedDop(it)
-                            ?: error("Couldn't find dop-structure-ref ${it.idref}")
-                    dop.offset()
+                            ?: odxlinkFailure("STRUCTURE", it)
+                    dop.offsetDOP()
                 }
 
             DefaultCase.startDefaultCase(builder)
@@ -2666,20 +2848,20 @@ class DatabaseWriter(
             DefaultCase.endDefaultCase(builder)
         }
 
-    private fun CASE.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-            val longName = this.longname?.offset()
-            val lowerLimit = this.lowerlimit.offset()
-            val upperLimit = this.upperlimit.offset()
+    private fun CASE.offsetCase(): Int =
+        cachedWithPath {
+            val shortName = this.shortname.offsetString()
+            val longName = this.longname?.offsetLongName()
+            val lowerLimit = this.lowerlimit.offsetLimit()
+            val upperLimit = this.upperlimit.offsetLimit()
 
             val structure =
                 this.structuresnref?.shortname?.let {
-                    collectionOf(this).resolveStructureByShortName(it)?.offset()
-                        ?: error("Couldn't find structure by short name: $it")
+                    collectionOf(this).resolveStructureByShortName(it)?.offsetDOP()
+                        ?: snrefFailure("STRUCTURE", it, this, collectionOf(this).structuresByShortName.keys)
                 } ?: this.structureref?.let {
-                    odx.resolveCombinedDop(it)?.offset()
-                        ?: error("Couldn't find dop-structure-ref ${it.idref}")
+                    odx.resolveCombinedDop(it)?.offsetDOP()
+                        ?: odxlinkFailure("STRUCTURE", it)
                 }
 
             Case.startCase(builder)
@@ -2691,41 +2873,43 @@ class DatabaseWriter(
             Case.endCase(builder)
         }
 
-    private fun TABLEROW.offset(): Int =
-        cachedObjects.getOrPut(this) {
-            val shortName = this.shortname.offset()
-            val semantic = this.semantic?.offset()
-            val longName = this.longname?.offset()
-            val key = this.key?.offset()
+    private fun TABLEROW.offsetTableRow(): Int =
+        this.cachedWithPath {
+            val shortName = this.shortname.offsetString()
+            val semantic = this.semantic?.offsetString()
+            val longName = this.longname?.offsetLongName()
+            val key = this.key?.offsetString()
 
             val dop =
                 this.dataobjectpropsnref?.shortname?.let {
-                    val dop = collectionOf(this).resolveDopByShortName(it) ?: error("Couldn't find DOP by short name: $it")
-                    dop.offset()
+                    val dop =
+                        collectionOf(this).resolveDopByShortName(it)
+                            ?: snrefFailure("DATA-OBJECT-PROP", it, this, collectionOf(this).dataObjectPropsByShortName.keys)
+                    dop.offsetDOP()
                 } ?: this.dataobjectpropref?.let {
-                    val dop = odx.resolveCombinedDop(it) ?: error("Couldn't find dop ${it.idref}")
-                    dop.offset()
+                    val dop = odx.resolveCombinedDop(it) ?: odxlinkFailure("DOP", it)
+                    dop.offsetDOP()
                 }
             val structure =
                 this.structuresnref?.shortname?.let {
                     val structureDop =
                         collectionOf(this).resolveStructureByShortName(it)
-                            ?: error("Couldn't find structure by short name: $it")
-                    structureDop.offset()
+                            ?: snrefFailure("STRUCTURE", it, this, collectionOf(this).structuresByShortName.keys)
+                    structureDop.offsetDOP()
                 } ?: this.structureref?.let {
-                    val structureDop = odx.resolveStructure(it) ?: error("Couldn't find structure ${it.idref}")
-                    structureDop.offset()
+                    val structureDop = odx.resolveStructure(it) ?: odxlinkFailure("STRUCTURE", it)
+                    structureDop.offsetDOP()
                 }
-            val sdgs = this.sdgs?.offset()
-            val audience = this.audience?.offset()
+            val sdgs = this.sdgs?.offsetSDGS()
+            val audience = this.audience?.offsetAudience()
             val functClasses =
                 this.functclassrefs
                     ?.functclassref
                     ?.map {
                         val functClass =
                             odx.resolveFunctClass(it)
-                                ?: error("Couldn't find funct class ${it.idref}")
-                        functClass.offset()
+                                ?: odxlinkFailure("FUNCT-CLASS", it)
+                        functClass.offsetFunctClass()
                     }?.toIntArray()
                     ?.let {
                         TableRow.createFunctClassRefsVector(builder, it)
@@ -2735,7 +2919,7 @@ class DatabaseWriter(
                 this.statetransitionrefs
                     ?.statetransitionref
                     ?.map {
-                        it.offset()
+                        it.offsetStateTransitionRef()
                     }?.toIntArray()
                     ?.let {
                         TableRow.createStateTransitionRefsVector(builder, it)
@@ -2745,7 +2929,7 @@ class DatabaseWriter(
                 this.preconditionstaterefs
                     ?.preconditionstateref
                     ?.map {
-                        it.offset()
+                        it.offsetPreConditionStateRef()
                     }?.toIntArray()
                     ?.let {
                         TableRow.createPreConditionStateRefsVector(builder, it)
@@ -2769,12 +2953,12 @@ class DatabaseWriter(
             TableRow.endTableRow(builder)
         }
 
-    private fun String.offset(): Int =
-        cachedObjects.getOrPut(this) {
+    private fun String.offsetString(): Int =
+        cachedWithPath {
             builder.createString(this)
         }
 
-    private fun ByteArray.offset(): Int = builder.createByteVector(this)
+    private fun ByteArray.offsetByteArray(): Int = builder.createByteVector(this)
 
     fun <T : DIAGCOMM> Collection<T>.filterByConverterOptions(options: ConverterOptions): List<T> =
         this.filter { it.isIncludedWithOption(options) }
@@ -2790,7 +2974,8 @@ class DatabaseWriter(
         val audiences =
             this.audience.enabledaudiencerefs.enabledaudienceref
                 .map {
-                    odx.resolveAdditionalAudience(it) ?: error("Can't find additional audience ${it.idref}")
+                    odx.resolveAdditionalAudience(it)
+                        ?: odxlinkFailure("ADDITIONAL-AUDIENCE", it)
                 }.map {
                     it.shortname
                 }
