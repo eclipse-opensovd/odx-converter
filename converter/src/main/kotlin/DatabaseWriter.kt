@@ -519,7 +519,7 @@ class DatabaseWriter(
                             is ODXLINK -> {
                                 val resolved =
                                     odx.resolveTableRow(row)
-                                        ?: error("Couldn't resolve TABLE-ROW-REF ${row.idref}")
+                                        ?: odxlinkFailure("TABLE-ROW", row)
                                 resolved.offsetTableRow()
                             }
                             else -> error("Unsupported row type ${row.javaClass.simpleName}")
@@ -908,13 +908,13 @@ class DatabaseWriter(
                                 if (elementName == "TABLE-SNREF") {
                                     val table =
                                         collection.resolveTableByShortName(entry.shortname)
-                                            ?: error("Couldn't find TABLE by short name: ${entry.shortname}")
+                                            ?: snrefFailure("TABLE", entry.shortname, this, collection.tablesByShortName.keys)
                                     tableKeyReference = table.offsetTableDop()
                                     tableKeyReferenceType = TableKeyReference.TableDop
                                 } else if (elementName == "TABLE-ROW-SNREF") {
                                     val row =
                                         collection.resolveTableRowByShortName(entry.shortname)
-                                            ?: error("Couldn't find TABLE-ROW by short name: ${entry.shortname}")
+                                            ?: snrefFailure("TABLE-ROW", entry.shortname, this, collection.tableRowsByShortName.keys)
                                     tableKeyReference = row.offsetTableRow()
                                     tableKeyReferenceType = TableKeyReference.TableRow
                                 } else {
