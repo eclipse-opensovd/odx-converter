@@ -222,7 +222,7 @@ class ODXCollectionGroupTest {
             ODXCollectionGroup(
                 data = mapOf("file1.odx" to odx),
                 rawSize = 100,
-                options = ConverterOptions(),
+                options = ConverterOptions(lenient = true),
                 logger = logger,
                 linkOwnership = IdentityHashMap(),
             )
@@ -541,7 +541,7 @@ class ODXCollectionGroupTest {
             ODXCollectionGroup(
                 data = mapOf("file1.odx" to odx),
                 rawSize = 100,
-                options = ConverterOptions(),
+                options = ConverterOptions(lenient = true),
                 logger = logger,
                 linkOwnership = IdentityHashMap(),
             )
@@ -603,7 +603,7 @@ class ODXCollectionGroupTest {
             ODXCollectionGroup(
                 data = mapOf("file1.odx" to odx1, "file2.odx" to odx2),
                 rawSize = 200,
-                options = ConverterOptions(),
+                options = ConverterOptions(lenient = true),
                 logger = testLogger,
                 linkOwnership = IdentityHashMap(),
             )

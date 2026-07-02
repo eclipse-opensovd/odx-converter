@@ -47,6 +47,8 @@ import java.util.logging.Logger
 import java.util.logging.StreamHandler
 import java.util.zip.ZipFile
 import javax.xml.stream.XMLInputFactory
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.io.path.fileSize
 import kotlin.system.exitProcess
 import kotlin.time.Duration
@@ -92,9 +94,12 @@ class FileConverter(
             val sizeBefore = chunk.data.size()
             logger.fine("Chunk '${chunk.name}' (${chunk.type}) to be processed by plugin '${plugin.getPluginIdentifier()}'")
             val handler = ChunkApiHandler(chunk)
-            plugin.processChunk(pluginHandler, initialData, handler)
+            val pluginDuration =
+                measureTime {
+                    plugin.processChunk(pluginHandler, initialData, handler)
+                }
             logger.fine(
-                "Chunk '${chunk.name}' (${chunk.type}) was processed by plugin '${plugin.getPluginIdentifier()}': $sizeBefore bytes -> ${chunk.data.size()} bytes",
+                "Chunk '${chunk.name}' (${chunk.type}) was processed by plugin '${plugin.getPluginIdentifier()}' in $pluginDuration: $sizeBefore bytes -> ${chunk.data.size()} bytes",
             )
             if (handler.removeChunk) {
                 logger.info(
@@ -143,7 +148,13 @@ class FileConverter(
 
             val odxRawSize = inputFileData.filter { it.key.contains(".odx") }.map { it.value.size }.sum()
 
-            val odxCollection = ODXCollectionGroup(odxData, odxRawSize, options, logger, linkCollector.linkToFile)
+            val odxCollection: ODXCollectionGroup
+            val indexingDuration =
+                measureTime {
+                    odxCollection =
+                        ODXCollectionGroup(odxData, odxRawSize, options, logger, linkCollector.linkToFile)
+                }
+            logger.fine("Building ODX collection index took $indexingDuration")
 
             if (options.withAudiences.isNotEmpty()) {
                 val validAudiences = odxCollection.additionalAudiences.map { it.shortname }
@@ -195,19 +206,46 @@ class FileConverter(
                     }
 
                     val chunkBuilder = ChunkBuilder()
+                    var buildDiagDescDuration: Duration = Duration.ZERO
                     compressionDuration =
                         measureTime {
-                            val chunk = chunkBuilder.createEcuDataChunk(logger, odxCollection, options)
+                            val chunk: Chunk.Builder
+                            buildDiagDescDuration =
+                                measureTime {
+                                    chunk = chunkBuilder.createEcuDataChunk(logger, odxCollection, options)
+                                }
+                            logger.fine("Building diagnostic description (FlatBuffers) took $buildDiagDescDuration")
                             val stat = handleAndAddChunk(chunk, plugins, pluginHandler, stats, mddFile)
                             stat?.rawSize = odxCollection.rawSize
                         }
-                    val jobChunks = chunkBuilder.createJobsChunks(logger, inputFileData, odxCollection, options)
-                    jobChunks.forEach { chunk ->
-                        handleAndAddChunk(chunk, plugins, pluginHandler, stats, mddFile)
+                    logger.fine(
+                        "Plugin processing (compression + hashing) of diagnostic description took ${compressionDuration - buildDiagDescDuration}",
+                    )
+
+                    var jobChunksDuration: Duration
+                    val jobChunks: List<Chunk.Builder>
+                    jobChunksDuration =
+                        measureTime {
+                            jobChunks = chunkBuilder.createJobsChunks(logger, inputFileData, odxCollection, options)
+                            jobChunks.forEach { chunk ->
+                                handleAndAddChunk(chunk, plugins, pluginHandler, stats, mddFile)
+                            }
+                        }
+                    if (jobChunks.isNotEmpty()) {
+                        logger.fine("Creating and processing ${jobChunks.size} job chunk(s) took $jobChunksDuration")
                     }
-                    val partialChunks = chunkBuilder.createPartialChunks(logger, inputFileData, odxCollection, options)
-                    partialChunks.forEach { chunk ->
-                        handleAndAddChunk(chunk, plugins, pluginHandler, stats, mddFile)
+
+                    var partialChunksDuration: Duration
+                    val partialChunks: List<Chunk.Builder>
+                    partialChunksDuration =
+                        measureTime {
+                            partialChunks = chunkBuilder.createPartialChunks(logger, inputFileData, odxCollection, options)
+                            partialChunks.forEach { chunk ->
+                                handleAndAddChunk(chunk, plugins, pluginHandler, stats, mddFile)
+                            }
+                        }
+                    if (partialChunks.isNotEmpty()) {
+                        logger.fine("Creating and processing ${partialChunks.size} partial chunk(s) took $partialChunksDuration")
                     }
 
                     plugins.forEach { plugin ->
@@ -216,11 +254,15 @@ class FileConverter(
 
                     sizeUncompressed = mddFile.chunksList.sumOf { it.uncompressedSize }
 
-                    val mddFileOut = mddFile.build()
-                    BufferedOutputStream(outputFile.outputStream()).use {
-                        it.write(FILE_MAGIC)
-                        mddFileOut.writeTo(it)
-                    }
+                    val serializationDuration =
+                        measureTime {
+                            val mddFileOut = mddFile.build()
+                            BufferedOutputStream(outputFile.outputStream()).use {
+                                it.write(FILE_MAGIC)
+                                mddFileOut.writeTo(it)
+                            }
+                        }
+                    logger.fine("MDD file serialization (protobuf build + write) took $serializationDuration")
                 }
 
             val sizeCompressed = outputFile.toPath().fileSize()
@@ -230,58 +272,74 @@ class FileConverter(
         }
     }
 
+    @OptIn(ExperimentalAtomicApi::class)
     private fun fillInputFileData(
         zipFile: ZipFile,
         odxData: MutableMap<String, ODX>,
         inputFileData: MutableMap<String, ZipEntryInfos>,
         linkCollector: ODXLinkCollector,
     ) {
-        zipFile.entries().toList().forEach { entry ->
-            if (entry.isDirectory) {
-                return@forEach
-            }
-            inputFileData[entry.name] =
-                ZipEntryInfos(
-                    size = entry.size,
-                ) { zipFile.getInputStream(entry) }
-        }
-
-        val unmarshaller = context.createUnmarshaller()
-        unmarshaller.listener = linkCollector
-
-        var hadParseErrors = false
-        // Output ODX validation errors to log file
-        unmarshaller.eventHandler =
-            ValidationEventHandler { event ->
-                val level =
-                    when (event.severity) {
-                        ValidationEvent.FATAL_ERROR -> Level.SEVERE
-                        ValidationEvent.ERROR -> Level.SEVERE
-                        ValidationEvent.WARNING -> Level.WARNING
-                        else -> Level.INFO
+        val zipReadDuration =
+            measureTime {
+                zipFile.entries().toList().forEach { entry ->
+                    if (entry.isDirectory) {
+                        return@forEach
                     }
-                logger.log(level, "ODX error: ${event.locator} ${event.message}")
-                hadParseErrors = true
-                true // keep going
-            }
-
-        inputFileData.forEach { entry ->
-            if (!entry.key.contains(".odx")) {
-                return@forEach
-            }
-            linkCollector.currentFile = entry.key
-            val odx =
-                entry.value.inputStream.invoke().use {
-                    unmarshaller
-                        .unmarshal(
-                            XMLInputFactory.newFactory().createXMLEventReader(it),
-                            ODX::class.java,
-                        ).value
+                    inputFileData[entry.name] =
+                        ZipEntryInfos(
+                            size = entry.size,
+                        ) { zipFile.getInputStream(entry) }
                 }
-            odxData[entry.key] = odx
-        }
+            }
+        logger.fine("Reading ZIP entries took $zipReadDuration (${inputFileData.size} entries)")
 
-        if (hadParseErrors) {
+        val odxEntries = inputFileData.filter { it.key.contains(".odx") }
+        val hadParseErrors = AtomicBoolean(false)
+        val xmlInputFactory = XMLInputFactory.newFactory()
+
+        val xmlParsingDuration =
+            measureTime {
+                val results =
+                    odxEntries.entries
+                        .parallelStream()
+                        .map { (fileName, entryInfo) ->
+                            val perFileCollector = ODXLinkCollector()
+                            perFileCollector.currentFile = fileName
+                            val unmarshaller = context.createUnmarshaller()
+                            unmarshaller.listener = perFileCollector
+                            unmarshaller.eventHandler =
+                                ValidationEventHandler { event ->
+                                    val level =
+                                        when (event.severity) {
+                                            ValidationEvent.FATAL_ERROR -> Level.SEVERE
+                                            ValidationEvent.ERROR -> Level.SEVERE
+                                            ValidationEvent.WARNING -> Level.WARNING
+                                            else -> Level.INFO
+                                        }
+                                    logger.log(level, "ODX error in $fileName: ${event.locator} ${event.message}")
+                                    hadParseErrors.store(true)
+                                    true // keep going
+                                }
+                            val odx =
+                                entryInfo.inputStream.invoke().use {
+                                    unmarshaller
+                                        .unmarshal(
+                                            xmlInputFactory.createXMLStreamReader(it),
+                                            ODX::class.java,
+                                        ).value
+                                }
+                            Triple(fileName, odx, perFileCollector.linkToFile)
+                        }.toList()
+
+                // Merge results back (sequential, fast)
+                results.forEach { (fileName, odx, links) ->
+                    odxData[fileName] = odx
+                    linkCollector.linkToFile.putAll(links)
+                }
+            }
+        logger.fine("XML parsing (JAXB unmarshalling) took $xmlParsingDuration (${odxEntries.size} ODX files, parallel)")
+
+        if (hadParseErrors.load()) {
             error("Errors were encountered while parsing the ODX file, see log for details, aborting")
         }
     }
@@ -349,9 +407,9 @@ class Converter : CliktCommand(name = "odx-converter") {
 
     private fun createConsoleLogHandler(fileName: String): StreamHandler? {
         if (pdxFiles.size == 1) {
-            return ConsoleHandlerWithFile(Level.INFO, null)
+            return ConsoleHandlerWithFile(logLevel ?: Level.INFO, null)
         } else if (logOnConsole) {
-            return ConsoleHandlerWithFile(Level.INFO, fileName)
+            return ConsoleHandlerWithFile(logLevel ?: Level.INFO, fileName)
         }
         return null
     }
