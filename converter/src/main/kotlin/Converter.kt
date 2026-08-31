@@ -13,6 +13,7 @@
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.main
+import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.help
 import com.github.ajalt.clikt.parameters.arguments.multiple
@@ -28,6 +29,8 @@ import com.github.ajalt.clikt.parameters.types.int
 import converter.plugin.api.ConverterApi
 import converter.plugin.api.ConverterPlugin
 import converter.plugin.api.ConverterPluginProvider
+import converter.plugin.api.SigningPlugin
+import converter.plugin.api.SigningPluginProvider
 import jakarta.xml.bind.JAXBContext
 import jakarta.xml.bind.ValidationEvent
 import jakarta.xml.bind.ValidationEventHandler
@@ -69,6 +72,9 @@ class FileConverter(
             .flatMap { it.getPlugins() }
             .sortedBy { it.getPluginPriority() }
     }
+
+    private fun retrieveSigningPlugins(): List<SigningPlugin> =
+        ServiceLoader.load(SigningPluginProvider::class.java).flatMap { it.getPlugins() }
 
     private fun getCurrentTimeReproducible(): Instant {
         val epochSeconds = System.getenv("SOURCE_DATE_EPOCH")?.toLong() ?: Instant.now().epochSecond
@@ -252,6 +258,40 @@ class FileConverter(
                         plugin.afterProcessing(pluginHandler)
                     }
 
+                    if (!options.skipSigning) {
+                        val signingPlugins = retrieveSigningPlugins()
+                        if (signingPlugins.isNotEmpty()) {
+                            val signingDuration =
+                                measureTime {
+                                    val errors =
+                                        SigningExecutor.apply(
+                                            mddFile,
+                                            signingPlugins,
+                                            "both",
+                                            options.signPluginOptions,
+                                            logger,
+                                            onChunkSigned = { chunk, plugin, count ->
+                                                logger.info(
+                                                    "Chunk '${chunk.name}' (${chunk.type}) received $count " +
+                                                        "signature(s) from signing plugin '${plugin.getPluginIdentifier()}'",
+                                                )
+                                            },
+                                            onFileSigned = { signature ->
+                                                logger.info(
+                                                    "Whole-file signature added (algorithm: '${signature.algorithm}')",
+                                                )
+                                            },
+                                        )
+                                    if (errors.isNotEmpty()) {
+                                        error(errors.joinToString("; "))
+                                    }
+                                }
+                            logger.fine("Signing took $signingDuration")
+                        } else {
+                            logger.fine("No signing plugins found on the classpath, skipping automatic signing")
+                        }
+                    }
+
                     sizeUncompressed = mddFile.chunksList.sumOf { it.uncompressedSize }
 
                     val serializationDuration =
@@ -345,7 +385,7 @@ class FileConverter(
     }
 }
 
-class Converter : CliktCommand(name = "odx-converter") {
+class ConvertCommand : CliktCommand(name = "convert") {
     val pdxFiles: List<File> by argument(name = "pdx-files")
         .file(mustExist = true, mustBeReadable = true, canBeFile = true)
         .help("pdx files to convert")
@@ -399,6 +439,19 @@ class Converter : CliktCommand(name = "odx-converter") {
                 "any enabled audience will always be included, but services with enabled audiences will only be " +
                 "included if at least one of the audience entries matches",
         ).multiple()
+
+    val skipSigning: Boolean by option("--skip-signing")
+        .help(
+            "Skip automatic signing after conversion. By default, all signing plugins found on the classpath are " +
+                "executed against every chunk and the whole file after conversion.",
+        ).flag(default = false)
+
+    val signPluginOptions: List<Pair<String, String>> by option("--sign-plugin-option")
+        .help(
+            "Option passed through to every signing plugin invoked after conversion, in the format: <key> <value>. " +
+                "Can be repeated.",
+        ).pair()
+        .multiple()
 
     private var hadErrors: Boolean = false
     private val context: JAXBContext =
@@ -467,6 +520,8 @@ class Converter : CliktCommand(name = "odx-converter") {
                                                     )
                                                 },
                                             withAudiences = withAudiences,
+                                            skipSigning = this.skipSigning,
+                                            signPluginOptions = this.signPluginOptions.toMap(),
                                         )
                                     val converter = FileConverter(logger, context)
                                     converter.convert(inputFile, outFile, options, stats)
@@ -502,12 +557,35 @@ class Converter : CliktCommand(name = "odx-converter") {
     }
 }
 
+/**
+ * Root command for the `odx-converter` binary. Supports subcommands `convert` (default), `sign`
+ * and `verify`. If the first argument is not a known subcommand name, `convert` is implied, to
+ * stay backward compatible with the previous single-command CLI.
+ */
+class OdxConverterCli : CliktCommand(name = "odx-converter") {
+    override fun run() = Unit
+}
+
+private val KNOWN_SUBCOMMANDS = setOf("convert", "sign", "verify", "view")
+
 fun main(args: Array<String>) {
-    val converter = Converter()
+    val cli =
+        OdxConverterCli().subcommands(
+            ConvertCommand(),
+            SignCommand(),
+            VerifyCommand(),
+            ViewCommand(),
+        )
     println("${ManifestReader.title} - version: ${ManifestReader.version}+${ManifestReader.commitHash.take(7)}\n")
     if (args.isEmpty()) {
-        converter.main(arrayOf("--help"))
-    } else {
-        converter.main(args)
+        cli.main(arrayOf("convert", "--help"))
+        return
     }
+    val effectiveArgs =
+        if (args[0] in KNOWN_SUBCOMMANDS || args[0] == "--help" || args[0] == "-h") {
+            args
+        } else {
+            arrayOf("convert", *args)
+        }
+    cli.main(effectiveArgs)
 }

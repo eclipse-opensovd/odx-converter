@@ -15,21 +15,15 @@ package converter.plugin.api
 
 import org.eclipse.opensovd.cda.mdd.Chunk
 import org.eclipse.opensovd.cda.mdd.MDDFile
-import java.util.logging.Logger
 
 /**
  * API for the converter, allows access to the contents of the mdd-file
  */
-interface ConverterApi {
+interface ConverterApi : PluginApi {
     /**
      * Allows access mdd-file through its builder
      */
     val mddFile: MDDFile.Builder
-
-    /**
-     * Logger to be used when the information should be logged into a file
-     */
-    val logger: Logger
 
     /**
      * Adds a chunk that will be processed by all plugins (including the one that added it)
