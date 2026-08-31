@@ -19,6 +19,8 @@ data class ConverterOptions(
     val includeJobFiles: Boolean = false,
     val partialJobFiles: List<PartialFilePattern> = emptyList(),
     val withAudiences: List<String> = emptyList(),
+    val skipSigning: Boolean = false,
+    val signPluginOptions: Map<String, String> = emptyMap(),
 )
 
 @Serializable

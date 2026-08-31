@@ -13,6 +13,8 @@
 
 import converter.plugin.api.ChunkApi
 import converter.plugin.api.ConverterApi
+import converter.plugin.api.SigningApi
+import converter.plugin.api.VerificationApi
 import org.eclipse.opensovd.cda.mdd.Chunk
 import org.eclipse.opensovd.cda.mdd.MDDFile
 import java.util.logging.Logger
@@ -31,6 +33,28 @@ class PluginApiHandler(
     override fun addChunk(chunk: Chunk.Builder) {
         addChunkFun(chunk, this)
     }
+}
+
+class SigningApiHandler(
+    private val mddFileBuilder: MDDFile.Builder,
+    private val loggerArg: Logger,
+) : SigningApi {
+    override val mddFile: MDDFile.Builder
+        get() = mddFileBuilder
+
+    override val logger: Logger
+        get() = loggerArg
+}
+
+class VerificationApiHandler(
+    private val mddFileArg: MDDFile,
+    private val loggerArg: Logger,
+) : VerificationApi {
+    override val mddFile: MDDFile
+        get() = mddFileArg
+
+    override val logger: Logger
+        get() = loggerArg
 }
 
 class ChunkApiHandler(
