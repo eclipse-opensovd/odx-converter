@@ -18,6 +18,7 @@ import com.github.ajalt.clikt.parameters.types.file
 import dataformat.EcuData
 import dataformat.EcuSharedData
 import dataformat.FunctionalGroup
+import dataformat.OdxData
 import dataformat.ParentRefType
 import dataformat.Protocol
 import dataformat.SD
@@ -46,7 +47,7 @@ class Viewer : CliktCommand() {
     override fun run() {
         val mddFile: MDDFile
 
-        lateinit var ecuData: EcuData
+        lateinit var odxData: OdxData
 
         val inputStream = file.inputStream()
 
@@ -74,34 +75,58 @@ class Viewer : CliktCommand() {
             }
         println("Decompression took ${decompressTime.inWholeMilliseconds} ms")
 
-        ecuData = EcuData.getRootAsEcuData(data)
+        odxData = OdxData.getRootAsOdxData(data)
 
         val bo = ByteArrayOutputStream()
         val o = PrintStream(bo)
 
-        o.indentedPrintln(0, "ECU: ${ecuData.ecuName} - Revision: ${ecuData.revision ?: "N/A"}")
+        o.indentedPrintln(0, "ECUs: ${(0 until odxData.ecuNamesLength).joinToString(", ") { odxData.ecuNames(it) ?: "?" }}")
 
-        for (i in 0 until ecuData.variantsLength) {
-            val variant = ecuData.variants(i)
-            o.indentedPrintln(0, "Variant: ${variant?.diagLayer?.shortName}")
-            for (j in 0 until (variant?.diagLayer?.diagServicesLength ?: 0)) {
-                val service = variant?.diagLayer?.diagServices(j)
-                o.indentedPrintln(2, service?.diagComm?.shortName)
+        for (e in 0 until odxData.ecusLength) {
+            val ecuData = odxData.ecus(e) ?: error("ecu must exist")
+            ecuData.output(o)
+        }
+
+        odxData.shared?.let { shared ->
+            o.indentedPrintln(0, "Shared:")
+            for (i in 0 until shared.functionalGroupsLength) {
+                val fg = shared.functionalGroups(i) ?: error("functional group must exist")
+                fg.output(o, 2)
             }
         }
 
-        for (i in 0 until ecuData.dtcsLength) {
-            val dtc = ecuData.dtcs(i) ?: error("dtc must exist")
-            o.indentedPrintln(0, dtc.displayTroubleCode)
-            dtc.sdgs?.output(o, 2)
-        }
-
-        for (i in 0 until ecuData.functionalGroupsLength) {
-            val fg = ecuData.functionalGroups(i) ?: error("functional group must exist")
-            fg.output(o, 0)
-        }
-
         println(bo.toString())
+    }
+
+    private fun EcuData.output(o: PrintStream) {
+        o.indentedPrintln(0, "ECU: ${this.ecuName} - Revision: ${this.revision ?: "N/A"}")
+
+        for (i in 0 until this.variantsLength) {
+            val variant = this.variants(i)
+            o.indentedPrintln(2, "Variant: ${variant?.diagLayer?.shortName}")
+            for (j in 0 until (variant?.diagLayer?.diagServicesLength ?: 0)) {
+                val service = variant?.diagLayer?.diagServices(j)
+                o.indentedPrintln(4, service?.diagComm?.shortName)
+            }
+            for (j in 0 until (variant?.diagLayer?.singleEcuJobsLength ?: 0)) {
+                val job = variant?.diagLayer?.singleEcuJobs(j) ?: continue
+                o.indentedPrintln(4, "Job: ${job.diagComm?.shortName}")
+                for (k in 0 until job.progCodesLength) {
+                    val progCode = job.progCodes(k) ?: continue
+                    o.indentedPrintln(6, "code-file: ${progCode.codeFile}")
+                    for (l in 0 until progCode.libraryLength) {
+                        val library = progCode.library(l) ?: continue
+                        o.indentedPrintln(6, "library code-file: ${library.codeFile}")
+                    }
+                }
+            }
+        }
+
+        for (i in 0 until this.dtcsLength) {
+            val dtc = this.dtcs(i) ?: error("dtc must exist")
+            o.indentedPrintln(2, dtc.displayTroubleCode)
+            dtc.sdgs?.output(o, 4)
+        }
     }
 
     private fun FunctionalGroup.output(

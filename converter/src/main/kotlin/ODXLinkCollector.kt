@@ -12,11 +12,13 @@
  */
 
 import jakarta.xml.bind.Unmarshaller
+import schema.odx.BASEVARIANT
 import schema.odx.CASE
 import schema.odx.COMPARAMREF
 import schema.odx.DIAGCOMM
 import schema.odx.ECUVARIANT
 import schema.odx.FIELD
+import schema.odx.FUNCTIONALGROUP
 import schema.odx.MATCHINGBASEVARIANTPARAMETER
 import schema.odx.MATCHINGPARAMETER
 import schema.odx.ODXLINK
@@ -59,6 +61,10 @@ class ODXLinkCollector : Unmarshaller.Listener() {
             is MATCHINGPARAMETER,
             is DIAGCOMM,
             is ECUVARIANT,
+            // Diag-layer container entries whose owning file must be resolvable
+            // for revision lookups (e.g. `ODXCollectionGroup.revisionFor`).
+            is BASEVARIANT,
+            is FUNCTIONALGROUP,
             -> {
                 linkToFile[target] = currentFile
             }

@@ -66,6 +66,7 @@ import dataformat.MatchingRequestParam
 import dataformat.MinMaxLengthType
 import dataformat.NormalDOP
 import dataformat.NrcConst
+import dataformat.OdxData
 import dataformat.Param
 import dataformat.ParamLengthInfoType
 import dataformat.ParamSpecificData
@@ -89,6 +90,7 @@ import dataformat.SDGS
 import dataformat.SDOrSDG
 import dataformat.SDxorSDG
 import dataformat.ScaleConstr
+import dataformat.SharedData
 import dataformat.SimpleOrComplexValueEntry
 import dataformat.SimpleValue
 import dataformat.SingleEcuJob
@@ -364,39 +366,86 @@ class DatabaseWriter(
     private val baseVariantMap: Map<BASEVARIANT, Int>
     private val ecuVariantMap: Map<ECUVARIANT, Int>
     private val functionalGroupMap: Map<FUNCTIONALGROUP, Int>
+    private val ecuSharedDataMap: Map<ECUSHAREDDATA, Int>
 
     init {
         dtcs = odx.dtcs.associateWith { it.offsetDTC() }
         baseVariantMap = odx.basevariants.associateWith { it.offsetVariantBase() }
         ecuVariantMap = odx.ecuvariants.associateWith { it.offsetVariantEcu() }
         functionalGroupMap = odx.functionalGroups.associateWith { it.offsetFunctionalGroup() }
+        ecuSharedDataMap = odx.ecuSharedDatas.associateWith { it.offsetEcuSharedData() }
     }
 
-    fun createEcuData(): ByteArray {
-        val version = "2025-05-10".offsetString()
-        val ecuName = odx.ecuName.offsetString()
-        val odxRevision = odx.odxRevision?.offsetString()
+    /** DTCs declared directly in the given diag layer's DTC-DOPs. */
+    private fun DIAGLAYER.dtcs(): List<schema.odx.DTC> =
+        this.diagdatadictionaryspec
+            ?.dtcdops
+            ?.dtcdop
+            ?.flatMap { it.dtcs?.dtcproxy?.filterIsInstance<schema.odx.DTC>() ?: emptyList() }
+            ?: emptyList()
 
-        val dtcs = EcuData.createDtcsVector(builder, dtcs.values.toIntArray())
-        val variants =
-            EcuData.createVariantsVector(
-                builder,
-                baseVariantMap.values.toIntArray() + ecuVariantMap.values.toIntArray(),
-            )
-        val functionalGroups = EcuData.createFunctionalGroupsVector(builder, functionalGroupMap.values.toIntArray())
+    /** Builds an [EcuData] for a single ECU (one BASE-VARIANT and its ECU-VARIANTs). */
+    private fun EcuGroup.toEcuDataOffset(): Int {
+        val ecuName = this.name.offsetString()
+        val revision = this.revision?.offsetString()
+
+        val variantOffsets =
+            (
+                listOfNotNull(this.baseVariant?.let { baseVariantMap.getValue(it) }) +
+                    this.ecuVariants.map { ecuVariantMap.getValue(it) }
+            ).toIntArray()
+        val variants = EcuData.createVariantsVector(builder, variantOffsets)
+
+        // DTCs reachable from this ECU's own variants' DTC-DOPs.
+        val ecuDtcs =
+            (listOfNotNull<DIAGLAYER>(this.baseVariant) + this.ecuVariants)
+                .flatMap { it.dtcs() }
+                .distinct()
+                .mapNotNull { dtcs[it] }
+                .toIntArray()
+        val dtcsVector = EcuData.createDtcsVector(builder, ecuDtcs)
 
         EcuData.startEcuData(builder)
-        EcuData.addVersion(builder, version)
         EcuData.addEcuName(builder, ecuName)
-        odxRevision?.let { EcuData.addRevision(builder, it) }
-
-        EcuData.addDtcs(builder, dtcs)
+        revision?.let { EcuData.addRevision(builder, it) }
         EcuData.addVariants(builder, variants)
-        EcuData.addFunctionalGroups(builder, functionalGroups)
+        EcuData.addDtcs(builder, dtcsVector)
+        return EcuData.endEcuData(builder)
+    }
 
-        val ecuData = EcuData.endEcuData(builder)
+    /** Builds the top-level [SharedData] with cross-cutting layers shared across ECUs. */
+    private fun sharedDataOffset(): Int {
+        val functionalGroups =
+            SharedData.createFunctionalGroupsVector(builder, functionalGroupMap.values.toIntArray())
+        val ecuSharedData =
+            SharedData.createEcuSharedDataVector(builder, ecuSharedDataMap.values.toIntArray())
 
-        builder.finish(ecuData)
+        SharedData.startSharedData(builder)
+        SharedData.addFunctionalGroups(builder, functionalGroups)
+        SharedData.addEcuSharedData(builder, ecuSharedData)
+        return SharedData.endSharedData(builder)
+    }
+
+    fun createOdxData(): ByteArray {
+        val version = "2025-05-10".offsetString()
+
+        val ecuOffsets = odx.ecuGroups.map { it.toEcuDataOffset() }.toIntArray()
+        val ecus = OdxData.createEcusVector(builder, ecuOffsets)
+
+        val ecuNameOffsets = odx.ecuNames.map { it.offsetString() }.toIntArray()
+        val ecuNames = OdxData.createEcuNamesVector(builder, ecuNameOffsets)
+
+        val shared = sharedDataOffset()
+
+        OdxData.startOdxData(builder)
+        OdxData.addVersion(builder, version)
+        OdxData.addEcuNames(builder, ecuNames)
+        OdxData.addEcus(builder, ecus)
+        OdxData.addShared(builder, shared)
+
+        val odxData = OdxData.endOdxData(builder)
+
+        builder.finish(odxData)
         return builder.sizedByteArray()
     }
 
@@ -1388,11 +1437,11 @@ class DatabaseWriter(
             CompuMethod.endCompuMethod(builder)
         }
 
-    private fun LIBRARY.offsetLibrary(): Int =
+    private fun LIBRARY.offsetLibrary(pdxName: String?): Int =
         this.cachedWithPath {
             val shortName = this.shortname.offsetString()
             val longName = this.longname?.offsetLongName()
-            val codeFile = this.codefile.offsetString()
+            val codeFile = odx.codeFileKey(pdxName, this.codefile).offsetString()
             val encryption = this.encryption?.offsetString()
             val syntax = this.syntax.offsetString()
             val entrypoint = this.entrypoint?.offsetString()
@@ -1413,9 +1462,9 @@ class DatabaseWriter(
             Library.endLibrary(builder)
         }
 
-    private fun PROGCODE.offsetProgCode(): Int =
+    private fun PROGCODE.offsetProgCode(pdxName: String?): Int =
         cachedWithPath {
-            val codeFile = this.codefile?.offsetString()
+            val codeFile = this.codefile?.let { odx.codeFileKey(pdxName, it).offsetString() }
             val encryption = this.encryption?.offsetString()
             val syntax = this.syntax?.offsetString()
             val revision = this.revision?.offsetString()
@@ -1427,7 +1476,7 @@ class DatabaseWriter(
                         val library =
                             odx.resolveLibrary(ref)
                                 ?: odxlinkFailure("LIBRARY", ref)
-                        library.offsetLibrary()
+                        library.offsetLibrary(pdxName)
                     }?.toIntArray()
                     ?.let {
                         ProgCode.createLibraryVector(builder, it)
@@ -1446,7 +1495,9 @@ class DatabaseWriter(
 
     private fun COMPUPHYSTOINTERNAL.offsetCompuPhysToInternal(): Int =
         cachedWithPath {
-            val progcode = this.progcode?.offsetProgCode()
+            // Compu-method prog codes are not emitted as code-file chunks, so their
+            // codefile reference is not PDX-scoped (no chunk-name collision possible).
+            val progcode = this.progcode?.offsetProgCode(null)
             val compuscales =
                 this.compuscales?.compuscale?.map { it.offsetCompuScale() }?.toIntArray()?.let {
                     CompuPhysToInternal.createCompuScalesVector(builder, it)
@@ -1462,7 +1513,9 @@ class DatabaseWriter(
 
     private fun COMPUINTERNALTOPHYS.offsetCompuInternalToPhys(): Int =
         cachedWithPath {
-            val progcode = this.progcode?.offsetProgCode()
+            // Compu-method prog codes are not emitted as code-file chunks, so their
+            // codefile reference is not PDX-scoped (no chunk-name collision possible).
+            val progcode = this.progcode?.offsetProgCode(null)
             val compuscales =
                 this.compuscales?.compuscale?.map { it.offsetCompuScale() }?.toIntArray()?.let {
                     CompuInternalToPhys.createCompuScalesVector(builder, it)
@@ -1946,12 +1999,13 @@ class DatabaseWriter(
 
     private fun SINGLEECUJOB.offsetSingleEcuJob(): Int =
         this.cachedWithPath {
+            val pdxName = odx.pdxNameFor(this)
             val diagComm = (this as DIAGCOMM).offsetInternal()
             val progCodes =
                 this.progcodes
                     ?.progcode
                     ?.map {
-                        it.offsetProgCode()
+                        it.offsetProgCode(pdxName)
                     }?.toIntArray()
                     ?.let {
                         SingleEcuJob.createProgCodesVector(builder, it)

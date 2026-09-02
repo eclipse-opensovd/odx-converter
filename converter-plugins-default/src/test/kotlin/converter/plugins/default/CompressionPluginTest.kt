@@ -74,7 +74,7 @@ class CompressionPluginTest {
         // Verify SHA-512 signature is added
         assertThat(chunkBuilder.signaturesList).hasSize(1)
         val signature = chunkBuilder.getSignatures(0)
-        assertThat(signature.algorithm).isEqualTo("sha512_uncompressed")
+        assertThat(signature.algorithmIdentifier).isEqualTo("sha512_uncompressed")
 
         // Verify the hash is correct
         val expectedHash = MessageDigest.getInstance("SHA-512").digest(testData)
