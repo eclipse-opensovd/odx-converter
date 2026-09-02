@@ -51,7 +51,7 @@ class SnrefIntegrationTest {
         val logger = Logger.getLogger("snref-integration-test")
         val converter = FileConverter(logger, context)
         val stats = mutableListOf<ChunkStat>()
-        converter.convert(pdxFile, mddOutputFile, ConverterOptions(), stats)
+        converter.convert(listOf(pdxFile), mddOutputFile, ConverterOptions(), stats)
 
         assertThat(mddOutputFile.exists()).isTrue()
         assertThat(mddOutputFile.length()).isGreaterThan(0)
@@ -131,7 +131,7 @@ class LenientTableKeyTest {
         val logger = Logger.getLogger("lenient-tablekey-test")
         val converter = FileConverter(logger, context)
         val stats = mutableListOf<ChunkStat>()
-        converter.convert(pdxFile, mddOutputFile, ConverterOptions(lenient = true), stats)
+        converter.convert(listOf(pdxFile), mddOutputFile, ConverterOptions(lenient = true), stats)
 
         assertThat(mddOutputFile.exists()).isTrue()
         assertThat(mddOutputFile.length()).isGreaterThan(0)

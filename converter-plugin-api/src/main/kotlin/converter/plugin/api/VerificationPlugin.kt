@@ -57,7 +57,7 @@ interface VerificationPlugin {
     ): VerificationResult
 
     /**
-     * Verifies the whole-file [signature] (`MDDFile.chunksSignature`).
+     * Verifies the whole-file [signature] (`MDDFile.chunksSignatureList`).
      *
      * @param api access to common plugin facilities (e.g. logging, plugin-specific options via
      *   [PluginApi.getPluginOption]).

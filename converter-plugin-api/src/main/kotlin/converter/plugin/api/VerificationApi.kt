@@ -19,7 +19,7 @@ import org.eclipse.opensovd.cda.mdd.MDDFile
  * API passed to [VerificationPlugin]s. In addition to the common [PluginApi] facilities (e.g.
  * logging), gives read-only access to the full mdd file being verified, so a plugin can inspect
  * parts of the file beyond the individual chunk/signature it was explicitly called for (e.g.
- * `ecuName`, `revision`, other chunks, metadata).
+ * `ecuInfos`, other chunks, metadata).
  */
 interface VerificationApi : PluginApi {
     /**

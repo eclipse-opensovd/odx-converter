@@ -19,6 +19,7 @@ import assertk.assertions.isGreaterThan
 import assertk.assertions.isNotNull
 import assertk.assertions.isTrue
 import dataformat.EcuData
+import dataformat.OdxData
 import dataformat.ParamType
 import jakarta.xml.bind.JAXBContext
 import org.eclipse.opensovd.cda.mdd.MDDFile
@@ -35,6 +36,7 @@ import kotlin.test.Test
  */
 class IntegrationTest {
     private lateinit var ecuData: EcuData
+    private lateinit var odxData: OdxData
     private lateinit var mddFile: MDDFile
     private lateinit var tempDir: File
 
@@ -54,12 +56,13 @@ class IntegrationTest {
         val logger = Logger.getLogger("integration-test")
         val converter = FileConverter(logger, context)
         val stats = mutableListOf<ChunkStat>()
-        converter.convert(pdxFile, mddOutputFile, ConverterOptions(), stats)
+        converter.convert(listOf(pdxFile), mddOutputFile, ConverterOptions(), stats)
 
         assertThat(mddOutputFile.exists()).isTrue()
         assertThat(mddOutputFile.length()).isGreaterThan(0)
 
         ecuData = readMddEcuData(mddOutputFile)
+        odxData = readMddOdxData(mddOutputFile)
         mddFile = readMddFile(mddOutputFile)
     }
 
@@ -439,20 +442,22 @@ class IntegrationTest {
 
     @Test
     fun `MDD contains functional group`() {
-        assertThat(ecuData.functionalGroupsLength).isGreaterThan(0)
+        val shared = odxData.shared!!
+        assertThat(shared.functionalGroupsLength).isGreaterThan(0)
 
         val fgNames =
-            (0 until ecuData.functionalGroupsLength).map {
-                ecuData.functionalGroups(it)?.diagLayer?.shortName
+            (0 until shared.functionalGroupsLength).map {
+                shared.functionalGroups(it)?.diagLayer?.shortName
             }
         assertThat(fgNames).contains("SharedDiagnostics")
     }
 
     @Test
     fun `functional group has TesterPresent service`() {
+        val shared = odxData.shared!!
         val fg =
-            (0 until ecuData.functionalGroupsLength)
-                .map { ecuData.functionalGroups(it) }
+            (0 until shared.functionalGroupsLength)
+                .map { shared.functionalGroups(it) }
                 .firstOrNull { it?.diagLayer?.shortName == "SharedDiagnostics" }
         assertThat(fg).isNotNull()
         assertThat(fg!!.diagLayer!!.diagServicesLength).isGreaterThan(0)
@@ -469,9 +474,10 @@ class IntegrationTest {
 
     @Test
     fun `functional group has parent reference to base variant`() {
+        val shared = odxData.shared!!
         val fg =
-            (0 until ecuData.functionalGroupsLength)
-                .map { ecuData.functionalGroups(it) }
+            (0 until shared.functionalGroupsLength)
+                .map { shared.functionalGroups(it) }
                 .firstOrNull { it?.diagLayer?.shortName == "SharedDiagnostics" }
         assertThat(fg).isNotNull()
         assertThat(fg!!.parentRefsLength).isGreaterThan(0)
@@ -615,7 +621,7 @@ class AudienceFilteringTest {
         val logger = Logger.getLogger("audience-filter-test")
         val converter = FileConverter(logger, context)
         val stats = mutableListOf<ChunkStat>()
-        converter.convert(pdxFile, mddOutputFile, ConverterOptions(withAudiences = listOf("SupplierAudience")), stats)
+        converter.convert(listOf(pdxFile), mddOutputFile, ConverterOptions(withAudiences = listOf("SupplierAudience")), stats)
 
         ecuData = readMddEcuData(mddOutputFile)
     }

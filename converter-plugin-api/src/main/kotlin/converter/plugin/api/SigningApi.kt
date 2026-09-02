@@ -19,7 +19,7 @@ import org.eclipse.opensovd.cda.mdd.MDDFile
  * API passed to [SigningPlugin]s. In addition to the common [PluginApi] facilities (e.g.
  * logging), gives access to the full mdd file being signed, through its builder, so a plugin can
  * inspect (or, if needed, modify) parts of the file beyond the individual chunk/signatures it was
- * explicitly called for (e.g. `ecuName`, `revision`, other chunks, metadata).
+ * explicitly called for (e.g. `ecuInfos`, other chunks, metadata).
  */
 interface SigningApi : PluginApi {
     /**

@@ -95,7 +95,7 @@ class SignCommand : CliktCommand(name = "sign") {
                             )
                         },
                         onFileSigned = { signature ->
-                            println("Set whole-file signature for '${file.name}' (algorithm: ${signature.algorithm})")
+                            println("Set whole-file signature for '${file.name}' (algorithm: ${signature.algorithmIdentifier})")
                         },
                     )
                 if (errors.isNotEmpty()) {

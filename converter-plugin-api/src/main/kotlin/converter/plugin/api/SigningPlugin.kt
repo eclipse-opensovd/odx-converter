@@ -34,7 +34,7 @@ interface SigningPlugin {
 
     /**
      * List of signature algorithm identifiers this plugin is able to produce (used for
-     * `Signature.algorithm` values it may set, and for CLI `--algorithm` filtering).
+     * `Signature.algorithmIdentifier` values it may set, and for CLI `--algorithm` filtering).
      */
     fun getSupportedAlgorithms(): List<String>
 
@@ -61,16 +61,12 @@ interface SigningPlugin {
     /**
      * Called by the `sign` command once per file, when file-scoped signing was requested.
      *
-     * Note: the current mdd format only supports a single whole-file signature
-     * (`MDDFile.chunksSignature`). This method still returns a [List] for forward compatibility
-     * with a planned format change to support multiple file-level signatures - the `sign`
-     * orchestrator currently enforces that the combined result of all invoked plugins contains at
-     * most one signature.
+     * The returned signatures are appended to `MDDFile.chunksSignatureList`, which supports
+     * multiple whole-file signatures (e.g. using different algorithms).
      *
      * @param api access to common plugin facilities (e.g. logging, plugin-specific options via
      *   [PluginApi.getPluginOption]).
-     * @param existingSignatures the whole-file signature(s) already present before this call (0 or
-     *   1 element with the current mdd format).
+     * @param existingSignatures the whole-file signature(s) already present before this call.
      * @return zero or more signatures for the whole file.
      */
     fun signFile(
