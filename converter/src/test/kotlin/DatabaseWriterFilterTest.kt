@@ -62,6 +62,7 @@ class DatabaseWriterFilterTest {
         every { odx.basevariants } returns emptyList()
         every { odx.ecuvariants } returns emptyList()
         every { odx.functionalGroups } returns emptyList()
+        every { odx.ecuSharedDatas } returns emptyList()
         every { odx.dtcs } returns emptyList()
         every { odx.resolveAdditionalAudience(any()) } answers {
             val link = firstArg<ODXLINK>()

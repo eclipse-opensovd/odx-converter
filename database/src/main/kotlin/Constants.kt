@@ -11,4 +11,4 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-val FILE_MAGIC = "MDD version 0      \u0000".toByteArray(Charsets.US_ASCII)
+val FILE_MAGIC = "MDD version 1      \u0000".toByteArray(Charsets.US_ASCII)

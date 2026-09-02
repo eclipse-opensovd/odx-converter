@@ -12,6 +12,7 @@
  */
 
 import dataformat.EcuData
+import dataformat.OdxData
 import org.apache.commons.compress.compressors.lzma.LZMACompressorInputStream
 import org.eclipse.opensovd.cda.mdd.Chunk
 import org.eclipse.opensovd.cda.mdd.MDDFile
@@ -44,9 +45,9 @@ fun packPdx(
 }
 
 /**
- * Reads an MDD file and returns the deserialized EcuData from the DIAGNOSTIC_DESCRIPTION chunk.
+ * Reads an MDD file and returns the deserialized OdxData from the DIAGNOSTIC_DESCRIPTION chunk.
  */
-fun readMddEcuData(mddFile: File): EcuData {
+fun readMddOdxData(mddFile: File): OdxData {
     val inputStream = mddFile.inputStream()
 
     val magic = inputStream.readNBytes(FILE_MAGIC.size)
@@ -64,7 +65,17 @@ fun readMddEcuData(mddFile: File): EcuData {
             ByteBuffer.wrap(lzma.readAllBytes())
         }
 
-    return EcuData.getRootAsEcuData(data)
+    return OdxData.getRootAsOdxData(data)
+}
+
+/**
+ * Reads an MDD file and returns the deserialized EcuData for the first ECU contained in the
+ * DIAGNOSTIC_DESCRIPTION chunk.
+ */
+fun readMddEcuData(mddFile: File): EcuData {
+    val odxData = readMddOdxData(mddFile)
+    return (0 until odxData.ecusLength)
+        .firstNotNullOf { odxData.ecus(it) }
 }
 
 /**
