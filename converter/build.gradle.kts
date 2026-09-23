@@ -37,6 +37,7 @@ dependencies {
     implementation(libs.clikt)
     implementation(libs.protobuf.java)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.apache.compress)
 
     if (!odxSchema.exists()) {
         // You need to provide your own schema as src/main/resources/schema/odx_2_2_0.xsd
