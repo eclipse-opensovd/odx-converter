@@ -12,6 +12,7 @@
  */
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.help
 import com.github.ajalt.clikt.parameters.arguments.multiple
@@ -20,9 +21,8 @@ import org.eclipse.opensovd.cda.mdd.Signature
 import java.io.File
 
 /**
- * `view` subcommand: prints the structure of the `.mdd` file format itself (file-level metadata,
- * and per-chunk size/metadata/signature info), without decoding the actual diagnostic description
- * content. For inspecting the decoded diagnostic description, use the standalone `viewer` binary.
+ * `view` subcommand: prints the structure of the `.mdd` file (file-level metadata, and per-chunk
+ * size/metadata/signature info).
  */
 class ViewCommand : CliktCommand(name = "view") {
     val mddFiles: List<File> by argument(name = "mdd-files")
@@ -117,4 +117,7 @@ class ViewCommand : CliktCommand(name = "view") {
         }
         return parts.joinToString(", ")
     }
+
+    override fun help(context: Context): String =
+        "Prints the structure of the .mdd file (file-level metadata, and per-chunk size/metadata/signature info)."
 }

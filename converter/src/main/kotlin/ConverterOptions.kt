@@ -12,6 +12,7 @@
  */
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 @Serializable
 data class ConverterOptions(
@@ -20,7 +21,11 @@ data class ConverterOptions(
     val partialJobFiles: List<PartialFilePattern> = emptyList(),
     val withAudiences: List<String> = emptyList(),
     val skipSigning: Boolean = false,
-    val signPluginOptions: Map<String, String> = emptyMap(),
+    // Plugin options may contain sensitive values (e.g. tokens/credentials passed to plugins) and
+    // must never be persisted into the output MDD file's metadata. @Transient excludes this field
+    // from JSON (de)serialization entirely, while still keeping it available in-memory for plugins.
+    @Transient
+    val pluginOptions: Map<String, String> = emptyMap(),
 )
 
 @Serializable

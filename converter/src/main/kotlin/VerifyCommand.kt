@@ -12,9 +12,11 @@
  */
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.help
 import com.github.ajalt.clikt.parameters.arguments.multiple
+import com.github.ajalt.clikt.parameters.options.associate
 import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.file
@@ -44,6 +46,12 @@ class VerifyCommand : CliktCommand(name = "verify") {
     val algorithm: String? by option("--algorithm")
         .help("Only verify signatures using this algorithm")
 
+    val pluginOptions: Map<String, String> by option("--plugin-option")
+        .help(
+            "Plugin-specific option, in the form <plugin-id>.<key>=<value>. Can be repeated. Made available " +
+                "to every verification plugin invoked.",
+        ).associate()
+
     private fun pluginsFor(
         plugins: List<VerificationPlugin>,
         signatureAlgorithm: String,
@@ -71,7 +79,7 @@ class VerifyCommand : CliktCommand(name = "verify") {
                     hadInvalid = true
                     return@forEach
                 }
-            val api = VerificationApiHandler(mddFile, logger)
+            val api = VerificationApiHandler(mddFile, logger, pluginOptions)
 
             mddFile.chunksList.forEach { chunk ->
                 if (chunk.signaturesCount == 0) {
@@ -130,11 +138,12 @@ class VerifyCommand : CliktCommand(name = "verify") {
         var valid = true
         candidates.forEach { plugin ->
             when (verify(plugin)) {
-                VerificationResult.VALID ->
+                VerificationResult.VALID -> {
                     println(
                         "OK: $scopeLabel signature '${signature.algorithm}' " +
                             "(plugin '${plugin.getPluginIdentifier()}') is valid",
                     )
+                }
 
                 VerificationResult.INVALID -> {
                     System.err.println(
@@ -144,13 +153,18 @@ class VerifyCommand : CliktCommand(name = "verify") {
                     valid = false
                 }
 
-                VerificationResult.UNSUPPORTED_ALGORITHM ->
+                VerificationResult.UNSUPPORTED_ALGORITHM -> {
                     System.err.println(
                         "WARN: plugin '${plugin.getPluginIdentifier()}' reported unsupported algorithm " +
                             "'${signature.algorithm}' for $scopeLabel",
                     )
+                }
             }
         }
         return valid
     }
+
+    override fun help(context: Context): String =
+        "Verifies signatures in .mdd files using OEM/vendor-provided verification plugins. " +
+            "If any signature is invalid, the command exits with a non-zero exit code."
 }

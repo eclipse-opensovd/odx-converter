@@ -12,14 +12,15 @@
  */
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.help
 import com.github.ajalt.clikt.parameters.arguments.multiple
+import com.github.ajalt.clikt.parameters.options.associate
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
-import com.github.ajalt.clikt.parameters.options.pair
 import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.file
 import converter.plugin.api.SigningPlugin
@@ -41,19 +42,18 @@ class SignCommand : CliktCommand(name = "sign") {
         .multiple()
 
     val scope: String by option("--scope")
-        .help("Whether to sign each chunk individually, the whole file, or both (default: both)")
+        .help("Whether to sign each chunk individually, the whole file, or both (default: chunk)")
         .choice("chunk", "file", "both")
-        .default("both")
+        .default("chunk")
 
     val algorithm: String? by option("--algorithm")
         .help("Only use signing plugins that support this algorithm (also used to disambiguate whole-file signing)")
 
-    val pluginOptions: List<Pair<String, String>> by option("--plugin-option")
+    val pluginOptions: Map<String, String> by option("--plugin-option")
         .help(
-            "Plugin-specific option, in the format: <key> <value>. Can be repeated. Passed through " +
-                "unchanged to every signing plugin invoked.",
-        ).pair()
-        .multiple()
+            "Plugin-specific option, in the form <plugin-id>.<key>=<value>. Can be repeated. Made available " +
+                "to every signing plugin invoked.",
+        ).associate()
 
     private fun retrievePlugins(): List<SigningPlugin> =
         ServiceLoader
@@ -72,7 +72,7 @@ class SignCommand : CliktCommand(name = "sign") {
             exitProcess(1)
         }
 
-        val options = pluginOptions.toMap()
+        val options = pluginOptions
         var hadErrors = false
 
         mddFiles.forEach { file ->
@@ -116,4 +116,6 @@ class SignCommand : CliktCommand(name = "sign") {
             exitProcess(1)
         }
     }
+
+    override fun help(context: Context): String = "Signs each chunk and/or the whole file of the given .mdd files, in-place."
 }

@@ -40,7 +40,7 @@ object SigningExecutor {
         onFileSigned: (Signature) -> Unit = {},
     ): List<String> {
         val errors = mutableListOf<String>()
-        val api = SigningApiHandler(builder, logger)
+        val api = SigningApiHandler(builder, logger, options)
 
         if (scope == "chunk" || scope == "both") {
             builder.chunksBuilderList.forEach { chunkBuilder ->
@@ -48,7 +48,7 @@ object SigningExecutor {
                 val chunk = chunkBuilder.build()
                 val data = chunk.data.toByteArray()
                 plugins.forEach { plugin ->
-                    val signatures = plugin.signChunk(api, chunk, data, options)
+                    val signatures = plugin.signChunk(api, chunk, data)
                     signatures.forEach { chunkBuilder.addSignatures(it) }
                     if (signatures.isNotEmpty()) {
                         onChunkSigned(chunk, plugin, signatures.size)
@@ -59,7 +59,7 @@ object SigningExecutor {
 
         if (scope == "file" || scope == "both") {
             val existingFileSignatures = if (builder.hasChunksSignature()) listOf(builder.chunksSignature) else emptyList()
-            val fileSignatures = plugins.flatMap { plugin -> plugin.signFile(api, existingFileSignatures, options) }
+            val fileSignatures = plugins.flatMap { plugin -> plugin.signFile(api, existingFileSignatures) }
             if (fileSignatures.size > 1) {
                 errors.add(
                     "Multiple signing plugins produced a whole-file signature, but the current mdd format only " +

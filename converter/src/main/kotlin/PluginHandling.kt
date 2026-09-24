@@ -22,6 +22,7 @@ import java.util.logging.Logger
 class PluginApiHandler(
     private val mddFileBuilder: MDDFile.Builder,
     private val loggerArg: Logger,
+    private val pluginOptions: Map<String, String> = emptyMap(),
     private val addChunkFun: (Chunk.Builder, PluginApiHandler) -> Unit,
 ) : ConverterApi {
     override val mddFile: MDDFile.Builder
@@ -33,28 +34,36 @@ class PluginApiHandler(
     override fun addChunk(chunk: Chunk.Builder) {
         addChunkFun(chunk, this)
     }
+
+    override fun getPluginOption(key: String): String? = pluginOptions[key]
 }
 
 class SigningApiHandler(
     private val mddFileBuilder: MDDFile.Builder,
     private val loggerArg: Logger,
+    private val pluginOptions: Map<String, String> = emptyMap(),
 ) : SigningApi {
     override val mddFile: MDDFile.Builder
         get() = mddFileBuilder
 
     override val logger: Logger
         get() = loggerArg
+
+    override fun getPluginOption(key: String): String? = pluginOptions[key]
 }
 
 class VerificationApiHandler(
     private val mddFileArg: MDDFile,
     private val loggerArg: Logger,
+    private val pluginOptions: Map<String, String> = emptyMap(),
 ) : VerificationApi {
     override val mddFile: MDDFile
         get() = mddFileArg
 
     override val logger: Logger
         get() = loggerArg
+
+    override fun getPluginOption(key: String): String? = pluginOptions[key]
 }
 
 class ChunkApiHandler(

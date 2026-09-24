@@ -41,7 +41,8 @@ interface VerificationPlugin {
     /**
      * Verifies a single chunk-scoped [signature].
      *
-     * @param api access to common plugin facilities (e.g. logging).
+     * @param api access to common plugin facilities (e.g. logging, plugin-specific options via
+     *   [PluginApi.getPluginOption]).
      * @param chunk the chunk [signature] belongs to. `chunk.signaturesList` contains all
      *   signatures present on this chunk (including [signature] itself).
      * @param signature the signature to verify.
@@ -58,7 +59,8 @@ interface VerificationPlugin {
     /**
      * Verifies the whole-file [signature] (`MDDFile.chunksSignature`).
      *
-     * @param api access to common plugin facilities (e.g. logging).
+     * @param api access to common plugin facilities (e.g. logging, plugin-specific options via
+     *   [PluginApi.getPluginOption]).
      * @param signature the whole-file signature to verify.
      */
     fun verifyFileSignature(

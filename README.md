@@ -28,23 +28,116 @@ Compression sizes vary, but here are some typical values:
 
 #### After building from source
 
+The CLI is built around a root `odx-converter` command with subcommands `convert`, `sign`,
+`verify`, and `view`. For backward compatibility, if the first argument isn't one of these
+subcommand names, `convert` is implied — so `converter-all.jar file.pdx` is equivalent to
+`converter-all.jar convert file.pdx`.
+
 ```shell
 java -jar converter/build/libs/converter-all.jar --help
 ```
 
 Output:
 ```
-Usage: converter [<options>] [<pdx-files>]...
+Usage: odx-converter [<options>] <command> [<args>]...
+
+  Converts ODX/PDX diagnostic descriptions into the .mdd format, and provides tooling to sign,
+  verify and inspect .mdd files.
+
+  If the first argument is not one of the subcommand names above, 'convert' is implied,
+  so 'odx-converter file.pdx' is equivalent to 'odx-converter convert file.pdx'.
+  Run 'odx-converter <subcommand> --help' for details on a specific subcommand.
+
+Options:
+  -h, --help  Show this message and exit
+
+Commands:
+  convert  Converts one or more .pdx files into the .mdd file format. By default, every input .mdd
+           file is also automatically signed using any signing plugins found on the classpath (see
+           --skip-signing).
+  sign     Signs each chunk and/or the whole file of the given .mdd files, in-place.
+  verify   Verifies signatures in .mdd files using OEM/vendor-provided verification plugins. If any
+           signature is invalid, the command exits with a non-zero exit code.
+  view     Prints the structure of the .mdd file (file-level metadata, and per-chunk
+           size/metadata/signature info).
+```
+
+##### `convert`
+
+```shell
+java -jar converter/build/libs/converter-all.jar convert --help
+```
+
+Output:
+```
+Usage: odx-converter convert [<options>] <pdx-files>...
 
 Options:
   -O, --output-directory=<path>  output directory for files (default: same as pdx-file)
-  -L, --lenient
+  -L, --lenient                  Continue conversion despite recoverable errors instead of aborting
   --include-job-files            Include job files & libraries referenced in single ecu jobs
-  --partial-job-files=<text>...  Include job files partially, and spread the contents as individual chunks. Argument can be repeated, and are in the format: <regex for job-file-name pattern> <regex for content file-name pattern>.
+  --partial-job-files=<text>...  Include job files partially, and spread the contents as individual chunks. Argument can be repeated, and is in the format: <regex for job-file-name pattern> <regex for content file-name pattern>.
+  -V, --version                  Print version information and exit
+  --log-level=(info|debug|trace) Sets the log level for the .mdd.log files
+  --log-on-console               Whether to also log to console when processing multiple files (if only one file is processed, logging is always done on console in addition to the log file)
+  -j, --parallel=<int>           Maximum number of files to process in parallel (default: number of available processors)
+  --with-audience=<text>         Includes services only when audience short names match - can be used multiple times, services without any enabled audience will always be included, but services with enabled audiences will only be included if at least one of the audience entries matches
+  --skip-signing                 Skip automatic signing after conversion. By default, all signing plugins found on the classpath are executed against every chunk and the whole file after conversion.
+  --plugin-option=<text>         Sets a plugin-specific option, in the form <plugin-id>.<key>=<value>. Can be used multiple times. Made available to converter plugins and to every signing plugin invoked after conversion. Example: --plugin-option compression.compress=false
   -h, --help                     Show this message and exit
 
 Arguments:
   <pdx-files>  pdx files to convert
+```
+
+##### `sign`
+
+Adds signatures to already-converted `.mdd` files, in-place, by delegating to OEM/vendor-provided
+signing plugins found on the classpath (see [Vendor Integration](docs/VENDOR_INTEGRATION.md)).
+
+```
+Usage: odx-converter sign [<options>] <mdd-files>...
+
+Options:
+  --scope=(chunk|file|both)  Whether to sign each chunk individually, the whole file, or both (default: chunk)
+  --algorithm=<text>         Only use signing plugins that support this algorithm (also used to disambiguate whole-file signing)
+  --plugin-option=<text>     Plugin-specific option, in the form <plugin-id>.<key>=<value>. Can be repeated. Made available to every signing plugin invoked.
+  -h, --help                 Show this message and exit
+
+Arguments:
+  <mdd-files>  mdd files to sign (modified in-place)
+```
+
+##### `verify`
+
+Verifies signatures in `.mdd` files using OEM/vendor-provided verification plugins; exits non-zero
+if any signature is invalid.
+
+```
+Usage: odx-converter verify [<options>] <mdd-files>...
+
+Options:
+  --algorithm=<text>      Only verify signatures using this algorithm
+  --plugin-option=<text>  Plugin-specific option, in the form <plugin-id>.<key>=<value>. Can be repeated. Made available to every verification plugin invoked.
+  -h, --help              Show this message and exit
+
+Arguments:
+  <mdd-files>  mdd files to verify
+```
+
+##### `view`
+
+Prints the structure of an `.mdd` file (file-level metadata, and per-chunk size/metadata/signature
+info).
+
+```
+Usage: odx-converter view [<options>] <mdd-files>...
+
+Options:
+  -h, --help  Show this message and exit
+
+Arguments:
+  <mdd-files>  mdd files to inspect
 ```
 
 ### Building 🏗️

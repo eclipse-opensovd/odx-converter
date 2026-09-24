@@ -264,7 +264,26 @@ Setting `project.version` in your root `build.gradle.kts` (or `gradle.properties
 |-----------|---------|
 | `ConverterPluginProvider` | Entry point discovered by ServiceLoader; returns a list of `ConverterPlugin` instances |
 | `ConverterPlugin` | Defines the plugin lifecycle: `beforeProcessing`, `processChunk`, `afterProcessing` |
-| `ConverterApi` | Provides access to the `MDDFile.Builder`, a `Logger`, and `addChunk()` |
+| `ConverterApi` | Provides access to the `MDDFile.Builder`, a `Logger`, `addChunk()`, and `getPluginOption()` |
 | `ChunkApi` | Provides access to the `Chunk.Builder` for the current chunk, plus `keepChunk()`/`removeChunk()` |
 
 All interfaces are in the `converter.plugin.api` package, provided by the `converter-plugin-api` module.
+
+### Plugin options
+
+The CLI provides a single generic `--plugin-option <plugin-id>.<key>=<value>` flag (repeatable) for
+passing user-configured options to plugins, for example:
+
+```sh
+odx-converter convert --plugin-option compression.compress=false input.pdx
+odx-converter sign --plugin-option vendor-hsm.pin=1234 input.mdd
+```
+
+Plugins should use their own plugin identifier as part of the key (e.g. `"compression.compress"`)
+to avoid clashing with other plugins' options. Values are always plain strings; plugins are
+responsible for parsing them (e.g. via `toBooleanStrictOrNull()`).
+
+- `ConverterPlugin` implementations read options via `ConverterApi.getPluginOption(key)`.
+- `SigningPlugin` implementations read options the same way, via `SigningApi.getPluginOption(key)`
+  passed into `signChunk`/`signFile` (sourced from `convert`'s `--plugin-option`, or from `sign`'s
+  own `--plugin-option` flag when using the standalone `sign` command).

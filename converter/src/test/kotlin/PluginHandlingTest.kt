@@ -12,7 +12,9 @@
  */
 
 import assertk.assertThat
+import assertk.assertions.isEqualTo
 import assertk.assertions.isFalse
+import assertk.assertions.isNull
 import assertk.assertions.isSameInstanceAs
 import assertk.assertions.isTrue
 import org.eclipse.opensovd.cda.mdd.Chunk
@@ -83,5 +85,22 @@ class PluginApiHandlerTest {
         handler.addChunk(chunkBuilder)
         assertThat(capturedChunk).isSameInstanceAs(chunkBuilder)
         assertThat(capturedHandler).isSameInstanceAs(handler)
+    }
+
+    @Test
+    fun `getPluginOption returns null when option is not set`() {
+        val mddBuilder = MDDFile.newBuilder()
+        val logger = Logger.getLogger("test")
+        val handler = PluginApiHandler(mddBuilder, logger) { _, _ -> }
+        assertThat(handler.getPluginOption("compression.compress")).isNull()
+    }
+
+    @Test
+    fun `getPluginOption returns the configured value`() {
+        val mddBuilder = MDDFile.newBuilder()
+        val logger = Logger.getLogger("test")
+        val handler =
+            PluginApiHandler(mddBuilder, logger, mapOf("compression.compress" to "false")) { _, _ -> }
+        assertThat(handler.getPluginOption("compression.compress")).isEqualTo("false")
     }
 }
