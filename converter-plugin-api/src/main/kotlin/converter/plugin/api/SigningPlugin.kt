@@ -42,14 +42,13 @@ interface SigningPlugin {
      * Called by the `sign` command for every chunk of the file, when chunk-scoped signing was
      * requested.
      *
-     * @param api access to common plugin facilities (e.g. logging).
+     * @param api access to common plugin facilities (e.g. logging, plugin-specific options via
+     *   [PluginApi.getPluginOption]).
      * @param chunk the chunk this signature is being requested for. `chunk.signaturesList` already
      *   contains any signatures present before this call (e.g. to detect the chunk has already
      *   been signed).
      * @param data the raw (possibly compressed) payload of [chunk], exactly as stored in the mdd
      *   file.
-     * @param options free-form key/value options passed through from the CLI (e.g. key/keystore
-     *   location, key identifiers, PIN, etc.) - entirely defined by the plugin.
      * @return zero, one, or multiple signatures to add to `chunk.signatures`. An empty list means
      *   this plugin does not want to add a signature (e.g. already signed, or not applicable).
      */
@@ -57,7 +56,6 @@ interface SigningPlugin {
         api: SigningApi,
         chunk: Chunk,
         data: ByteArray,
-        options: Map<String, String>,
     ): List<Signature>
 
     /**
@@ -69,15 +67,14 @@ interface SigningPlugin {
      * orchestrator currently enforces that the combined result of all invoked plugins contains at
      * most one signature.
      *
-     * @param api access to common plugin facilities (e.g. logging).
+     * @param api access to common plugin facilities (e.g. logging, plugin-specific options via
+     *   [PluginApi.getPluginOption]).
      * @param existingSignatures the whole-file signature(s) already present before this call (0 or
      *   1 element with the current mdd format).
-     * @param options free-form key/value options passed through from the CLI.
      * @return zero or more signatures for the whole file.
      */
     fun signFile(
         api: SigningApi,
         existingSignatures: List<Signature>,
-        options: Map<String, String>,
     ): List<Signature>
 }

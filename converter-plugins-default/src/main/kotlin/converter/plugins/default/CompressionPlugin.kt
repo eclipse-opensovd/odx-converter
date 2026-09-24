@@ -24,6 +24,10 @@ import kotlin.time.measureTime
 
 /**
  * Default compression plugin, compresses chunks with LZMA, and adds a sha512 hash of the initial (uncompressed) data.
+ *
+ * Compression can be disabled via the plugin option `compression.compress=false` (e.g. via the
+ * `--plugin-option compression.compress=false` CLI flag), in which case chunk data is kept as-is
+ * and `compressionAlgorithm` is left unset (empty).
  */
 class CompressionPlugin : ConverterPlugin {
     override fun getPluginIdentifier(): String = "compression"
@@ -45,20 +49,27 @@ class CompressionPlugin : ConverterPlugin {
     ) {
         val data = chunkApi.chunk.data?.toByteArray() ?: initialData
 
-        // Compress chunk
-        api.logger.finest("Compressing chunk with LZMA")
-        val compressed: ByteArrayOutputStream
-        val compressionDuration =
-            measureTime {
-                compressed = ByteArrayOutputStream()
-                LZMACompressorOutputStream(compressed).use { outputStream ->
-                    outputStream.write(data)
-                }
-            }
-        api.logger.fine("LZMA compression took $compressionDuration (${data.size} -> ${compressed.size()} bytes)")
+        val compress = api.getPluginOption("compression.compress")?.toBooleanStrictOrNull() ?: true
 
-        chunkApi.chunk.setData(ByteString.copyFrom(compressed.toByteArray()))
-        chunkApi.chunk.compressionAlgorithm = "lzma"
+        if (compress) {
+            // Compress chunk
+            api.logger.finest("Compressing chunk with LZMA")
+            val compressed: ByteArrayOutputStream
+            val compressionDuration =
+                measureTime {
+                    compressed = ByteArrayOutputStream()
+                    LZMACompressorOutputStream(compressed).use { outputStream ->
+                        outputStream.write(data)
+                    }
+                }
+            api.logger.fine("LZMA compression took $compressionDuration (${data.size} -> ${compressed.size()} bytes)")
+
+            chunkApi.chunk.setData(ByteString.copyFrom(compressed.toByteArray()))
+            chunkApi.chunk.compressionAlgorithm = "lzma"
+        } else {
+            api.logger.finest("Skipping compression for chunk (compression.compress=false)")
+            chunkApi.chunk.setData(ByteString.copyFrom(data))
+        }
 
         // Add hash of uncompressed data as signature
         api.logger.finest("Calculating SHA-512 for chunk")

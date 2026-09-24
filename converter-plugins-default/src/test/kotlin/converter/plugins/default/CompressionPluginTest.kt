@@ -54,6 +54,7 @@ class CompressionPluginTest {
 
         val api = mockk<ConverterApi>()
         every { api.logger } returns Logger.getLogger("test")
+        every { api.getPluginOption(any()) } returns null
 
         val chunkApi = mockk<ChunkApi>()
         every { chunkApi.chunk } returns chunkBuilder
@@ -89,6 +90,7 @@ class CompressionPluginTest {
 
         val api = mockk<ConverterApi>()
         every { api.logger } returns Logger.getLogger("test")
+        every { api.getPluginOption(any()) } returns null
 
         val chunkApi = mockk<ChunkApi>()
         every { chunkApi.chunk } returns chunkBuilder
@@ -111,6 +113,7 @@ class CompressionPluginTest {
 
         val api = mockk<ConverterApi>()
         every { api.logger } returns Logger.getLogger("test")
+        every { api.getPluginOption(any()) } returns null
 
         val chunkApi = mockk<ChunkApi>()
         every { chunkApi.chunk } returns chunkBuilder
@@ -118,5 +121,55 @@ class CompressionPluginTest {
         plugin.processChunk(api, testData, chunkApi)
 
         assertThat(chunkBuilder.data.size()).isLessThan(testData.size)
+    }
+
+    @Test
+    fun `processChunk skips compression when compression_compress option is false`() {
+        val testData = "Hello, this is test data for compression!".repeat(10).toByteArray()
+        val chunkBuilder = Chunk.newBuilder().setData(ByteString.copyFrom(testData))
+
+        val api = mockk<ConverterApi>()
+        every { api.logger } returns Logger.getLogger("test")
+        every { api.getPluginOption("compression.compress") } returns "false"
+
+        val chunkApi = mockk<ChunkApi>()
+        every { chunkApi.chunk } returns chunkBuilder
+
+        plugin.processChunk(api, testData, chunkApi)
+
+        // Verify compression algorithm is left unset since compression was skipped
+        assertThat(chunkBuilder.compressionAlgorithm).isEqualTo("")
+
+        // Verify data is unchanged (not compressed)
+        assertThat(chunkBuilder.data.toByteArray().toList()).isEqualTo(testData.toList())
+
+        // Verify SHA-512 signature is still added
+        assertThat(chunkBuilder.signaturesList).hasSize(1)
+        val signature = chunkBuilder.getSignatures(0)
+        assertThat(signature.algorithm).isEqualTo("sha512_uncompressed")
+        val expectedHash = MessageDigest.getInstance("SHA-512").digest(testData)
+        assertThat(signature.signature.toByteArray().toList()).isEqualTo(expectedHash.toList())
+    }
+
+    @Test
+    fun `processChunk compresses when compression_compress option is explicitly true`() {
+        val testData = "Hello, this is test data for compression!".repeat(10).toByteArray()
+        val chunkBuilder = Chunk.newBuilder().setData(ByteString.copyFrom(testData))
+
+        val api = mockk<ConverterApi>()
+        every { api.logger } returns Logger.getLogger("test")
+        every { api.getPluginOption("compression.compress") } returns "true"
+
+        val chunkApi = mockk<ChunkApi>()
+        every { chunkApi.chunk } returns chunkBuilder
+
+        plugin.processChunk(api, testData, chunkApi)
+
+        assertThat(chunkBuilder.compressionAlgorithm).isEqualTo("lzma")
+        val decompressed =
+            LZMACompressorInputStream(ByteArrayInputStream(chunkBuilder.data.toByteArray())).use {
+                it.readAllBytes()
+            }
+        assertThat(decompressed.toList()).isEqualTo(testData.toList())
     }
 }

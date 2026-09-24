@@ -24,4 +24,18 @@ interface PluginApi {
      * Logger to be used when the information should be logged into a file
      */
     val logger: Logger
+
+    /**
+     * Retrieve a plugin-specific option value, set via the CLI's generic plugin-option
+     * mechanism (e.g. the `--plugin-option` flag, available on the `convert`, `sign`, and
+     * `verify` commands).
+     *
+     * Plugins are responsible for using their own plugin identifier as part of the key,
+     * conventionally in the form `<plugin-id>.<key>` (e.g. `"compression.compress"`), to avoid
+     * clashing with other plugins' options.
+     *
+     * @return the raw string value if set, or `null` if the option was not provided. Plugins are
+     * responsible for parsing/validating the value themselves (e.g. via `toBooleanStrictOrNull()`).
+     */
+    fun getPluginOption(key: String): String?
 }

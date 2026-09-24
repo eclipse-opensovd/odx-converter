@@ -12,6 +12,7 @@
  */
 
 import assertk.assertThat
+import assertk.assertions.doesNotContain
 import assertk.assertions.isEmpty
 import assertk.assertions.isEqualTo
 import assertk.assertions.isFalse
@@ -27,6 +28,7 @@ class ConverterOptionsTest {
         assertThat(options.includeJobFiles).isFalse()
         assertThat(options.partialJobFiles).isEmpty()
         assertThat(options.withAudiences).isEmpty()
+        assertThat(options.pluginOptions).isEmpty()
     }
 
     @Test
@@ -48,10 +50,23 @@ class ConverterOptionsTest {
                         PartialFilePattern(jobFilePattern = ".*\\.jar", includePattern = ".*\\.class"),
                     ),
                 withAudiences = listOf("AfterSales", "Development"),
+                pluginOptions = mapOf("compression.compress" to "false"),
             )
         val json = Json.encodeToString(options)
         val decoded = Json.decodeFromString<ConverterOptions>(json)
-        assertThat(decoded).isEqualTo(options)
+        // pluginOptions is @Transient and must never survive (de)serialization.
+        assertThat(decoded).isEqualTo(options.copy(pluginOptions = emptyMap()))
+    }
+
+    @Test
+    fun `pluginOptions are excluded from serialization`() {
+        val options = ConverterOptions(pluginOptions = mapOf("foo.secret-token" to "supersecret"))
+        val json = Json.encodeToString(options)
+        assertThat(json).doesNotContain("supersecret")
+        assertThat(json).doesNotContain("pluginOptions")
+
+        val decoded = Json.decodeFromString<ConverterOptions>(json)
+        assertThat(decoded.pluginOptions).isEmpty()
     }
 
     @Test

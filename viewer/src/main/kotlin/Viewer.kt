@@ -12,8 +12,10 @@
  */
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.arguments.help
 import com.github.ajalt.clikt.parameters.types.file
 import dataformat.EcuData
 import dataformat.EcuSharedData
@@ -35,13 +37,19 @@ import java.nio.ByteBuffer
 import kotlin.time.measureTime
 
 class Viewer : CliktCommand() {
-    val file by argument(name = "file").file(
-        mustExist = true,
-        canBeFile = true,
-        canBeDir = false,
-        mustBeWritable = false,
-        mustBeReadable = true,
-    )
+    override fun help(context: Context): String =
+        "Decodes and prints the diagnostic description contained in an .mdd file (variants, ECUs, services, " +
+            "DOPs, etc.)."
+
+    val file by argument(name = "file")
+        .help("the .mdd file to inspect")
+        .file(
+            mustExist = true,
+            canBeFile = true,
+            canBeDir = false,
+            mustBeWritable = false,
+            mustBeReadable = true,
+        )
 
     override fun run() {
         val mddFile: MDDFile
@@ -62,14 +70,19 @@ class Viewer : CliktCommand() {
 
         mddFile = MDDFile.parser().parseFrom(inputStream)
 
-        val diagnosticDescription =
-            mddFile.chunksList.first { chunk -> chunk.type.equals(Chunk.DataType.DIAGNOSTIC_DESCRIPTION) }.data
+        val diagnosticDescriptionChunk =
+            mddFile.chunksList.first { chunk -> chunk.type.equals(Chunk.DataType.DIAGNOSTIC_DESCRIPTION) }
+        val diagnosticDescription = diagnosticDescriptionChunk.data
 
         lateinit var data: ByteBuffer
         val decompressTime =
             measureTime {
-                LZMACompressorInputStream(diagnosticDescription.newInput()).use { inputStream ->
-                    data = ByteBuffer.wrap(inputStream.readAllBytes())
+                if (diagnosticDescriptionChunk.compressionAlgorithm == "lzma") {
+                    LZMACompressorInputStream(diagnosticDescription.newInput()).use { inputStream ->
+                        data = ByteBuffer.wrap(inputStream.readAllBytes())
+                    }
+                } else {
+                    data = ByteBuffer.wrap(diagnosticDescription.toByteArray())
                 }
             }
         println("Decompression took ${decompressTime.inWholeMilliseconds} ms")
