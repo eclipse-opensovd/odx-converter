@@ -54,14 +54,18 @@ class ChunkBuilderTest {
         job.shortname = "TestJob"
         job.progcodes = progCodes
 
+        val collection = mockk<ODXCollection>()
+        every { collection.singleEcuJobs } returns mapOf(job.id to job)
+        every { collection.libraries } returns emptyMap()
+
         val odx = mockk<ODXCollectionGroup>()
-        every { odx.singleEcuJobs } returns listOf(job)
-        every { odx.libraries } returns emptyList()
+        every { odx.collectionsWithPdxName() } returns listOf(collection to "pdx1")
+        every { odx.codeFileKey(any(), any()) } answers { secondArg() }
 
         val fileContent = "binary data".toByteArray()
         val inputData =
             mapOf(
-                "job.jar" to
+                "pdx1${ODXCollectionGroup.PDX_NAME_SEPARATOR}job.jar" to
                     ZipEntryInfos(
                         size = fileContent.size.toLong(),
                         inputStream = { ByteArrayInputStream(fileContent) },
@@ -86,14 +90,18 @@ class ChunkBuilderTest {
         library.codefile = "lib.jar"
         library.syntax = "JAVA"
 
+        val collection = mockk<ODXCollection>()
+        every { collection.singleEcuJobs } returns emptyMap()
+        every { collection.libraries } returns mapOf(library.id to library)
+
         val odx = mockk<ODXCollectionGroup>()
-        every { odx.singleEcuJobs } returns emptyList()
-        every { odx.libraries } returns listOf(library)
+        every { odx.collectionsWithPdxName() } returns listOf(collection to "pdx1")
+        every { odx.codeFileKey(any(), any()) } answers { secondArg() }
 
         val fileContent = "lib data".toByteArray()
         val inputData =
             mapOf(
-                "lib.jar" to
+                "pdx1${ODXCollectionGroup.PDX_NAME_SEPARATOR}lib.jar" to
                     ZipEntryInfos(
                         size = fileContent.size.toLong(),
                         inputStream = { ByteArrayInputStream(fileContent) },
@@ -125,14 +133,18 @@ class ChunkBuilderTest {
                 progcodes = PROGCODES().apply { progcode.add(progCode2) }
             }
 
+        val collection = mockk<ODXCollection>()
+        every { collection.singleEcuJobs } returns mapOf(job1.id to job1, job2.id to job2)
+        every { collection.libraries } returns emptyMap()
+
         val odx = mockk<ODXCollectionGroup>()
-        every { odx.singleEcuJobs } returns listOf(job1, job2)
-        every { odx.libraries } returns emptyList()
+        every { odx.collectionsWithPdxName() } returns listOf(collection to "pdx1")
+        every { odx.codeFileKey(any(), any()) } answers { secondArg() }
 
         val fileContent = "shared data".toByteArray()
         val inputData =
             mapOf(
-                "shared.jar" to
+                "pdx1${ODXCollectionGroup.PDX_NAME_SEPARATOR}shared.jar" to
                     ZipEntryInfos(
                         size = fileContent.size.toLong(),
                         inputStream = { ByteArrayInputStream(fileContent) },

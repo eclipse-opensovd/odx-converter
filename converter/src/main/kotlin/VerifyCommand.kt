@@ -87,7 +87,7 @@ class VerifyCommand : CliktCommand(name = "verify") {
                 }
                 val data by lazy { chunk.data.toByteArray() }
                 chunk.signaturesList.forEach { signature ->
-                    if (algorithm != null && signature.algorithm != algorithm) {
+                    if (algorithm != null && signature.algorithmIdentifier != algorithm) {
                         return@forEach
                     }
                     if (!verifySignature(
@@ -101,9 +101,8 @@ class VerifyCommand : CliktCommand(name = "verify") {
                 }
             }
 
-            if (mddFile.hasChunksSignature()) {
-                val signature = mddFile.chunksSignature
-                if (algorithm == null || signature.algorithm == algorithm) {
+            mddFile.chunksSignatureList.forEach { signature ->
+                if (algorithm == null || signature.algorithmIdentifier == algorithm) {
                     if (!verifySignature(
                             plugins,
                             signature,
@@ -128,10 +127,10 @@ class VerifyCommand : CliktCommand(name = "verify") {
         scopeLabel: String,
         verify: (VerificationPlugin) -> VerificationResult,
     ): Boolean {
-        val candidates = pluginsFor(plugins, signature.algorithm)
+        val candidates = pluginsFor(plugins, signature.algorithmIdentifier)
         if (candidates.isEmpty()) {
             System.err.println(
-                "WARN: $scopeLabel has a signature with unsupported algorithm '${signature.algorithm}', skipping",
+                "WARN: $scopeLabel has a signature with unsupported algorithm '${signature.algorithmIdentifier}', skipping",
             )
             return true
         }
@@ -140,14 +139,14 @@ class VerifyCommand : CliktCommand(name = "verify") {
             when (verify(plugin)) {
                 VerificationResult.VALID -> {
                     println(
-                        "OK: $scopeLabel signature '${signature.algorithm}' " +
+                        "OK: $scopeLabel signature '${signature.algorithmIdentifier}' " +
                             "(plugin '${plugin.getPluginIdentifier()}') is valid",
                     )
                 }
 
                 VerificationResult.INVALID -> {
                     System.err.println(
-                        "FAIL: $scopeLabel signature '${signature.algorithm}' " +
+                        "FAIL: $scopeLabel signature '${signature.algorithmIdentifier}' " +
                             "(plugin '${plugin.getPluginIdentifier()}') is INVALID",
                     )
                     valid = false
@@ -156,7 +155,7 @@ class VerifyCommand : CliktCommand(name = "verify") {
                 VerificationResult.UNSUPPORTED_ALGORITHM -> {
                     System.err.println(
                         "WARN: plugin '${plugin.getPluginIdentifier()}' reported unsupported algorithm " +
-                            "'${signature.algorithm}' for $scopeLabel",
+                            "'${signature.algorithmIdentifier}' for $scopeLabel",
                     )
                 }
             }

@@ -13,6 +13,7 @@
 
 import assertk.assertThat
 import assertk.assertions.hasSize
+import assertk.assertions.isEmpty
 import assertk.assertions.isEqualTo
 import assertk.assertions.isNotNull
 import assertk.assertions.isNull
@@ -76,11 +77,11 @@ class ODXCollectionGroupTest {
                 logger = logger,
                 linkOwnership = IdentityHashMap(),
             )
-        assertThat(group.ecuName).isEqualTo("MyECU")
+        assertThat(group.ecuGroups.single().name).isEqualTo("MyECU")
     }
 
     @Test
-    fun `ecuName is functional_groups when only functional groups exist`() {
+    fun `synthetic functional_groups ECU group when only functional groups exist`() {
         val odx = ODX()
         val dlc = DIAGLAYERCONTAINER()
         dlc.shortname = "Container1"
@@ -98,7 +99,10 @@ class ODXCollectionGroupTest {
                 logger = logger,
                 linkOwnership = IdentityHashMap(),
             )
-        assertThat(group.ecuName).isEqualTo("functional_groups")
+        assertThat(group.ecuGroups).hasSize(1)
+        assertThat(group.ecuGroups.single().name).isEqualTo("functional_groups")
+        assertThat(group.ecuGroups.single().baseVariant).isNull()
+        assertThat(group.ecuGroups.single().ecuVariants).isEmpty()
     }
 
     @Test
@@ -122,8 +126,8 @@ class ODXCollectionGroupTest {
                 linkOwnership = IdentityHashMap(),
             )
         assertThat(group.collections).hasSize(2)
-        assertThat(group.collections["Container1"]).isNotNull()
-        assertThat(group.collections["Container2"]).isNotNull()
+        assertThat(group.collections["file1.odx"]).isNotNull()
+        assertThat(group.collections["file2.odx"]).isNotNull()
     }
 
     @Test

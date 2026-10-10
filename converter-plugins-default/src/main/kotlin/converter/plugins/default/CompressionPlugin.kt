@@ -80,7 +80,7 @@ class CompressionPlugin : ConverterPlugin {
                 val signature =
                     Signature
                         .newBuilder()
-                        .setAlgorithm("sha512_uncompressed")
+                        .setAlgorithmIdentifier("sha512_uncompressed")
                         .setSignature(ByteString.copyFrom(uncompressedDigest))
                 chunkApi.chunk.addSignatures(signature)
             }

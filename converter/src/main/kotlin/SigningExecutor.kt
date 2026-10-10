@@ -26,9 +26,7 @@ object SigningExecutor {
     /**
      * Applies [plugins] to [builder] according to [scope] (`"chunk"`, `"file"`, or `"both"`).
      *
-     * @return a list of human-readable error messages; empty if everything succeeded. Currently,
-     *   the only possible error is more than one signing plugin producing a whole-file signature
-     *   (the mdd format only supports a single whole-file signature).
+     * @return a list of human-readable error messages; empty if everything succeeded.
      */
     fun apply(
         builder: MDDFile.Builder,
@@ -58,18 +56,11 @@ object SigningExecutor {
         }
 
         if (scope == "file" || scope == "both") {
-            val existingFileSignatures = if (builder.hasChunksSignature()) listOf(builder.chunksSignature) else emptyList()
+            val existingFileSignatures = builder.chunksSignatureList.toList()
             val fileSignatures = plugins.flatMap { plugin -> plugin.signFile(api, existingFileSignatures) }
-            if (fileSignatures.size > 1) {
-                errors.add(
-                    "Multiple signing plugins produced a whole-file signature, but the current mdd format only " +
-                        "supports a single whole-file signature. Use --algorithm to disambiguate.",
-                )
-            } else {
-                fileSignatures.firstOrNull()?.let {
-                    builder.chunksSignature = it
-                    onFileSigned(it)
-                }
+            fileSignatures.forEach {
+                builder.addChunksSignature(it)
+                onFileSigned(it)
             }
         }
 

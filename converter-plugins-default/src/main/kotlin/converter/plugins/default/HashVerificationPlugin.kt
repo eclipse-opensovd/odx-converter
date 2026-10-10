@@ -37,7 +37,7 @@ class HashVerificationPlugin : VerificationPlugin {
         signature: Signature,
         data: ByteArray,
     ): VerificationResult {
-        if (signature.algorithm != ALGORITHM) {
+        if (signature.algorithmIdentifier != ALGORITHM) {
             return VerificationResult.UNSUPPORTED_ALGORITHM
         }
 

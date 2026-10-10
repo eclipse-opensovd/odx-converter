@@ -17,6 +17,12 @@ import java.util.logging.Logger
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 
+/** A code/job file reference together with the PDX it originates from. */
+private data class CodeFileRef(
+    val pdxName: String,
+    val codeFile: String,
+)
+
 class ChunkBuilder {
     fun createJobsChunks(
         logger: Logger,
@@ -27,22 +33,33 @@ class ChunkBuilder {
         if (!options.includeJobFiles) {
             return emptyList()
         }
-        val jobFiles =
-            odx.singleEcuJobs
-                .flatMap { it.progcodes?.progcode ?: emptyList() }
-                .mapNotNull { it.codefile }
-        val libraries = odx.libraries.mapNotNull { it.codefile }
-        val files = (jobFiles + libraries).toSet()
-        return files.mapNotNull { fileName ->
-            val data = inputData[fileName]
+        // Collect (sourcePdxName, codeFilePath) pairs per source collection so that
+        // each code file can be looked up scoped to its origin PDX and named with
+        // the same (possibly PDX-prefixed) key that is stored in the flatbuffer.
+        val files =
+            odx
+                .collectionsWithPdxName()
+                .flatMap { (collection, pdxName) ->
+                    val jobFiles =
+                        collection.singleEcuJobs.values
+                            .flatMap { it.progcodes?.progcode ?: emptyList() }
+                            .mapNotNull { it.codefile }
+                    val libraries = collection.libraries.values.mapNotNull { it.codefile }
+                    (jobFiles + libraries).map { codeFile -> CodeFileRef(pdxName, codeFile) }
+                }.toSet()
+
+        return files.mapNotNull { ref ->
+            val lookupKey = "${ref.pdxName}${ODXCollectionGroup.PDX_NAME_SEPARATOR}${ref.codeFile}"
+            val data = inputData[lookupKey]
 
             checkNotNull(data) {
-                "File $fileName is not included in PDX"
+                "File ${ref.codeFile} is not included in PDX ${ref.pdxName}"
             }
-            logger.info("Including $fileName (${data.size} bytes)")
+            val chunkName = odx.codeFileKey(ref.pdxName, ref.codeFile)
+            logger.info("Including $chunkName (${data.size} bytes)")
             Chunk
                 .newBuilder()
-                .setName(fileName)
+                .setName(chunkName)
                 .setType(Chunk.DataType.CODE_FILE)
                 .setUncompressedSize(data.size)
                 .setData(ByteString.copyFrom(data.inputStream.invoke().use { it.readAllBytes() }))
@@ -59,49 +76,62 @@ class ChunkBuilder {
             return emptyList()
         }
 
-        val jobFiles =
-            odx.singleEcuJobs
-                .flatMap { it.progcodes?.progcode ?: emptyList() }
-                .mapNotNull { it.codefile }
-        val libraries = odx.libraries.mapNotNull { it.codefile }
-        val files = (jobFiles + libraries).toSet()
-        return files.flatMap { jobFileName ->
+        val files =
+            odx
+                .collectionsWithPdxName()
+                .flatMap { (collection, pdxName) ->
+                    val jobFiles =
+                        collection.singleEcuJobs.values
+                            .flatMap { it.progcodes?.progcode ?: emptyList() }
+                            .mapNotNull { it.codefile }
+                    val libraries = collection.libraries.values.mapNotNull { it.codefile }
+                    (jobFiles + libraries).map { codeFile -> CodeFileRef(pdxName, codeFile) }
+                }.toSet()
+
+        return files.flatMap { ref ->
+            val jobFileName = ref.codeFile
+            val lookupKey = "${ref.pdxName}${ODXCollectionGroup.PDX_NAME_SEPARATOR}$jobFileName"
+            // The (possibly PDX-prefixed) key used for chunk naming, matching the
+            // reference stored in the flatbuffer.
+            val codeFileKey = odx.codeFileKey(ref.pdxName, jobFileName)
             options.partialJobFiles
                 .mapNotNull { partial ->
                     if (!jobFileName.matches(Regex(partial.jobFilePattern))) {
                         null
                     } else {
                         logger.fine("Job file $jobFileName matches pattern")
-                        check(inputData.containsKey(jobFileName)) {
-                            "File $jobFileName is not included in PDX"
+                        check(inputData.containsKey(lookupKey)) {
+                            "File $jobFileName is not included in PDX ${ref.pdxName}"
                         }
                         PartialJobFilePattern(jobFileName, partial)
                     }
                 }.groupBy {
                     it.jobFileName
-                }.flatMap {
+                }.flatMap { entry ->
                     val data =
-                        inputData[it.key] ?: error("File $jobFileName is not included in PDX")
-                    if (it.key.endsWith(".jar", ignoreCase = true) || it.key.endsWith(".zip", ignoreCase = true)) {
+                        inputData[lookupKey] ?: error("File $jobFileName is not included in PDX ${ref.pdxName}")
+                    if (jobFileName.endsWith(".jar", ignoreCase = true) ||
+                        jobFileName.endsWith(".zip", ignoreCase = true)
+                    ) {
                         ZipInputStream(data.inputStream.invoke()).use { zip ->
                             val matches =
                                 extractMatchingFilesFromZip(
                                     logger,
                                     zip,
-                                    it.value.map { pjfp -> Regex(pjfp.partialFilePattern.includePattern) },
+                                    entry.value.map { pjfp -> Regex(pjfp.partialFilePattern.includePattern) },
                                 )
                             matches.map { match ->
                                 val filename = match.first
-                                val data = match.second
+                                val matchData = match.second
 
-                                logger.info("Including $filename from $jobFileName (${data.size} bytes)")
+                                logger.info("Including $filename from $codeFileKey (${matchData.size} bytes)")
 
                                 Chunk
                                     .newBuilder()
-                                    .setName("$jobFileName::$filename")
+                                    .setName("$codeFileKey::$filename")
                                     .setType(Chunk.DataType.CODE_FILE_PARTIAL)
-                                    .setUncompressedSize(data.size.toLong())
-                                    .setData(ByteString.copyFrom(data))
+                                    .setUncompressedSize(matchData.size.toLong())
+                                    .setData(ByteString.copyFrom(matchData))
                             }
                         }
                     } else {
@@ -117,10 +147,10 @@ class ChunkBuilder {
         options: ConverterOptions,
     ): Chunk.Builder {
         val dw = DatabaseWriter(logger = logger, odx = odxCollection, options = options)
-        val data = dw.createEcuData()
+        val data = dw.createOdxData()
         return Chunk
             .newBuilder()
-            .setName(odxCollection.ecuName)
+            .setName("diagnostic_description")
             .setType(Chunk.DataType.DIAGNOSTIC_DESCRIPTION)
             .setUncompressedSize(data.size.toLong())
             .setData(ByteString.copyFrom(data))

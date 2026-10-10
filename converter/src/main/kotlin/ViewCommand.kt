@@ -44,9 +44,9 @@ class ViewCommand : CliktCommand(name = "view") {
 
         println("File: ${file.name}")
         println("  Format version: ${mddFile.version}")
-        println("  ECU name: ${mddFile.ecuName}")
-        if (mddFile.hasRevision()) {
-            println("  Revision: ${mddFile.revision}")
+        mddFile.ecuInfosList.forEach { ecu ->
+            val revision = if (ecu.hasRevision()) " (revision: ${ecu.revision})" else ""
+            println("  ECU: ${ecu.ecuName}$revision")
         }
         if (mddFile.featureFlagsList.isNotEmpty()) {
             println("  Feature flags: ${mddFile.featureFlagsList.joinToString(", ")}")
@@ -55,8 +55,8 @@ class ViewCommand : CliktCommand(name = "view") {
             println("  Metadata:")
             mddFile.metadataMap.forEach { (key, value) -> println("    $key: $value") }
         }
-        if (mddFile.hasChunksSignature()) {
-            println("  Whole-file signature: ${mddFile.chunksSignature.describe()}")
+        if (mddFile.chunksSignatureCount > 0) {
+            mddFile.chunksSignatureList.forEach { println("  Whole-file signature: ${it.describe()}") }
         } else {
             println("  Whole-file signature: none")
         }
@@ -104,7 +104,7 @@ class ViewCommand : CliktCommand(name = "view") {
     }
 
     private fun Signature.describe(): String {
-        val parts = mutableListOf("algorithm: $algorithm")
+        val parts = mutableListOf("algorithm: $algorithmIdentifier")
         if (hasKeyIdentifier()) {
             parts.add("key identifier: present")
         }
