@@ -218,7 +218,11 @@ class DatabaseWriter(
     private val odx: ODXCollectionGroup,
     private val options: ConverterOptions,
 ) {
-    private val builder = FlatBufferBuilder()
+    private val builder =
+        FlatBufferBuilder().apply {
+            // Explicit zero offsets must remain distinct from unspecified positions.
+            forceDefaults(true)
+        }
 
     private val cachedObjects: MutableMap<Any, Int> = mutableMapOf()
 

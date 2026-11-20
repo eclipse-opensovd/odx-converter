@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 The Contributors to Eclipse OpenSOVD (see CONTRIBUTORS)
+SPDX-License-Identifier: Apache-2.0
+-->
+<ODX MODEL-VERSION="2.2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <DIAG-LAYER-CONTAINER ID="positions_container">
+    <SHORT-NAME>PositionsContainer</SHORT-NAME>
+    <BASE-VARIANTS>
+      <BASE-VARIANT ID="positions_ecu">
+        <SHORT-NAME>PositionsECU</SHORT-NAME>
+        <DIAG-COMMS>
+          <DIAG-SERVICE ID="positions_service" SEMANTIC="DATA" ADDRESSING="PHYSICAL">
+            <SHORT-NAME>ReadPositions</SHORT-NAME>
+            <REQUEST-REF ID-REF="positions_request"/>
+          </DIAG-SERVICE>
+        </DIAG-COMMS>
+        <REQUESTS>
+          <REQUEST ID="positions_request">
+            <SHORT-NAME>PositionsRequest</SHORT-NAME>
+            <PARAMS>
+              <PARAM xsi:type="CODED-CONST">
+                <SHORT-NAME>FirstFlag</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <BIT-POSITION>0</BIT-POSITION>
+                <CODED-VALUE>1</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>2</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <PARAM xsi:type="CODED-CONST">
+                <SHORT-NAME>SecondFlag</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <BIT-POSITION>2</BIT-POSITION>
+                <CODED-VALUE>2</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>2</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <PARAM xsi:type="CODED-CONST">
+                <SHORT-NAME>ThirdFlag</SHORT-NAME>
+                <BYTE-POSITION>0</BYTE-POSITION>
+                <BIT-POSITION>4</BIT-POSITION>
+                <CODED-VALUE>3</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>2</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <PARAM xsi:type="CODED-CONST">
+                <SHORT-NAME>PositionedField</SHORT-NAME>
+                <BYTE-POSITION>1</BYTE-POSITION>
+                <CODED-VALUE>42</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+              <PARAM xsi:type="CODED-CONST">
+                <SHORT-NAME>ImplicitField</SHORT-NAME>
+                <CODED-VALUE>99</CODED-VALUE>
+                <DIAG-CODED-TYPE xsi:type="STANDARD-LENGTH-TYPE" BASE-DATA-TYPE="A_UINT32">
+                  <BIT-LENGTH>8</BIT-LENGTH>
+                </DIAG-CODED-TYPE>
+              </PARAM>
+            </PARAMS>
+          </REQUEST>
+        </REQUESTS>
+      </BASE-VARIANT>
+    </BASE-VARIANTS>
+  </DIAG-LAYER-CONTAINER>
+</ODX>
